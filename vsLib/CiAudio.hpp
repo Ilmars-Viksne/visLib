@@ -6,6 +6,9 @@
 #include <stdexcept>
 #include <vector>
 #include <memory>
+#include <Audioclient.h>
+#include <Endpointvolume.h>
+
 
 class CiAudio {
 private:
@@ -15,8 +18,20 @@ private:
     // Vector of smart pointers to manage COM endpoint objects.
     std::vector<std::unique_ptr<IMMDevice>> m_pEndpoints;
 
+    // Pointer to the WAVEFORMATEX structure that specifies the stream format.
+    WAVEFORMATEX* m_pFormat;
+
+    // Pointer to the IMMDevice interface.
+    IMMDevice* m_pDevice;
+
+    // Pointer to the IAudioClient interface.
+    IAudioClient* m_pAudioClient;
+
+    // Index of the audio client.
+    size_t m_sizeAudioClientNo;
+
 public:
-    CiAudio() {
+    CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_sizeAudioClientNo(-1) {
         // Initialize COM library using RAII.
         HRESULT hr = CoInitialize(nullptr);
         if (FAILED(hr)) {
@@ -41,10 +56,9 @@ public:
         m_pEndpoints.reserve(count);
 
         for (UINT i = 0; i < count; i++) {
-            IMMDevice* pEndpoint = nullptr;
-            hr = pCollection->Item(i, &pEndpoint);
+            hr = pCollection->Item(i, &m_pDevice);
             if (SUCCEEDED(hr)) {
-                m_pEndpoints.emplace_back(pEndpoint);
+                m_pEndpoints.emplace_back(m_pDevice);
             }
         }
 
@@ -68,6 +82,25 @@ public:
         throw std::out_of_range("Invalid endpoint index.");
     }
 
+    // Activate an endpoint by index.
+    void activateEndpointByIndex(size_t index) {
+        if (index >= m_pEndpoints.size())
+            throw std::out_of_range("Invalid endpoint index.");
+
+        m_sizeAudioClientNo = index;
+
+        m_pDevice = m_pEndpoints[m_sizeAudioClientNo].get();
+
+        // Get the stream format.
+        HRESULT hr = m_pDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, NULL, (void**)&m_pAudioClient);
+        if (SUCCEEDED(hr)) {
+            hr = m_pAudioClient->GetMixFormat(&m_pFormat);
+            if (FAILED(hr)) {
+                throw std::runtime_error("Failed to get stream format.");
+            }
+        }
+
+    }
 
     ~CiAudio() {
         // Uninitialize COM library using RAII.
@@ -110,4 +143,46 @@ public:
 
         return info.str();
     }
+
+    std::wstring getStreamFormatInfo() {
+        if (m_pFormat == nullptr) {
+            throw std::runtime_error("Stream format is not initialized.");
+        }
+
+        std::wstringstream info;
+
+        if (m_pFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
+            WAVEFORMATEXTENSIBLE* pFormatExt = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(m_pFormat);
+            info << L"Format: WAVE_FORMAT_EXTENSIBLE\n";
+            info << L"Channels: " << pFormatExt->Format.nChannels << L"\n";
+            info << L"Sample Rate: " << pFormatExt->Format.nSamplesPerSec << L"\n";
+            info << L"Average Bytes Per Second: " << pFormatExt->Format.nAvgBytesPerSec << L"\n";
+            info << L"Block Align: " << pFormatExt->Format.nBlockAlign << L"\n";
+            info << L"Bits Per Sample: " << pFormatExt->Format.wBitsPerSample << L"\n";
+            info << L"Size: " << pFormatExt->Format.cbSize << L"\n";
+
+            // Check if the SubFormat is KSDATAFORMAT_SUBTYPE_IEEE_FLOAT or KSDATAFORMAT_SUBTYPE_PCM.
+            if (IsEqualGUID(pFormatExt->SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)) {
+                info << L"SubFormat: KSDATAFORMAT_SUBTYPE_IEEE_FLOAT\n";
+            }
+            else if (IsEqualGUID(pFormatExt->SubFormat, KSDATAFORMAT_SUBTYPE_PCM)) {
+                info << L"SubFormat: KSDATAFORMAT_SUBTYPE_PCM\n";
+            }
+            else {
+                info << L"SubFormat: Other\n";
+            }
+        }
+        else {
+            info << L"Format: " << m_pFormat->wFormatTag << L"\n";
+            info << L"Channels: " << m_pFormat->nChannels << L"\n";
+            info << L"Sample Rate: " << m_pFormat->nSamplesPerSec << L"\n";
+            info << L"Average Bytes Per Second: " << m_pFormat->nAvgBytesPerSec << L"\n";
+            info << L"Block Align: " << m_pFormat->nBlockAlign << L"\n";
+            info << L"Bits Per Sample: " << m_pFormat->wBitsPerSample << L"\n";
+            info << L"Size: " << m_pFormat->cbSize << L"\n";
+        }
+
+        return info.str();
+    }
+
 };
