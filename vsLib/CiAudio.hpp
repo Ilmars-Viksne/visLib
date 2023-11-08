@@ -153,13 +153,13 @@ public:
 
         if (m_pFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
             WAVEFORMATEXTENSIBLE* pFormatExt = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(m_pFormat);
-            info << L"Format: WAVE_FORMAT_EXTENSIBLE\n";
-            info << L"Channels: " << pFormatExt->Format.nChannels << L"\n";
-            info << L"Sample Rate: " << pFormatExt->Format.nSamplesPerSec << L"\n";
-            info << L"Average Bytes Per Second: " << pFormatExt->Format.nAvgBytesPerSec << L"\n";
-            info << L"Block Align: " << pFormatExt->Format.nBlockAlign << L"\n";
-            info << L"Bits Per Sample: " << pFormatExt->Format.wBitsPerSample << L"\n";
-            info << L"Size: " << pFormatExt->Format.cbSize << L"\n";
+            info << L"Waveform audio format: WAVE_FORMAT_EXTENSIBLE\n";
+            info << L"Number of Channels: " << pFormatExt->Format.nChannels << L"\n";
+            info << L"Sample Rate: " << pFormatExt->Format.nSamplesPerSec << L" (Hz)\n";
+            info << L"Average Bytes Per Second: " << pFormatExt->Format.nAvgBytesPerSec << L" (B/s)\n";
+            info << L"Block Align: " << pFormatExt->Format.nBlockAlign << L" (B)\n";
+            info << L"Bits Per Sample: " << pFormatExt->Format.wBitsPerSample << L" (bit)\n";
+            info << L"Size of Extra Information Appended to WAVEFORMATEX: " << pFormatExt->Format.cbSize << L" (bit)\n";
 
             // Check if the SubFormat is KSDATAFORMAT_SUBTYPE_IEEE_FLOAT or KSDATAFORMAT_SUBTYPE_PCM.
             if (IsEqualGUID(pFormatExt->SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)) {
@@ -175,11 +175,11 @@ public:
         else {
             info << L"Format: " << m_pFormat->wFormatTag << L"\n";
             info << L"Channels: " << m_pFormat->nChannels << L"\n";
-            info << L"Sample Rate: " << m_pFormat->nSamplesPerSec << L"\n";
-            info << L"Average Bytes Per Second: " << m_pFormat->nAvgBytesPerSec << L"\n";
-            info << L"Block Align: " << m_pFormat->nBlockAlign << L"\n";
-            info << L"Bits Per Sample: " << m_pFormat->wBitsPerSample << L"\n";
-            info << L"Size: " << m_pFormat->cbSize << L"\n";
+            info << L"Sample Rate: " << m_pFormat->nSamplesPerSec << L" (Hz)\n";
+            info << L"Average Bytes Per Second: " << m_pFormat->nAvgBytesPerSec << L" (B/s)\n";
+            info << L"Block Align: " << m_pFormat->nBlockAlign << L" (B)\n";
+            info << L"Bits Per Sample: " << m_pFormat->wBitsPerSample << L" (bit)\n";
+            info << L"Size of Extra Information Appended to WAVEFORMATEX: " << m_pFormat->cbSize << L" (bit)\n";
         }
 
         return info.str();
