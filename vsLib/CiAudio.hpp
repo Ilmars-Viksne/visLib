@@ -8,7 +8,7 @@
 #include <memory>
 #include <Audioclient.h>
 #include <Endpointvolume.h>
-
+#include <thread>
 
 class CiAudio {
 private:
@@ -29,6 +29,12 @@ private:
 
     // Index of the audio client.
     size_t m_sizeAudioClientNo;
+
+    // Pointer to the IAudioCaptureClient interface.
+    IAudioCaptureClient* m_pCaptureClient;
+
+    // Vector to accumulate the read audio data.
+    std::vector<float> m_audioData;
 
 public:
     CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_sizeAudioClientNo(-1) {
@@ -82,6 +88,11 @@ public:
         throw std::out_of_range("Invalid endpoint index.");
     }
 
+    // Getter for the audio data
+    std::vector<float> getAudioData() const {
+        return m_audioData;
+    }
+
     // Activate an endpoint by index.
     void activateEndpointByIndex(size_t index) {
         if (index >= m_pEndpoints.size())
@@ -98,8 +109,25 @@ public:
             if (FAILED(hr)) {
                 throw std::runtime_error("Failed to get stream format.");
             }
-        }
 
+            // Initialize the audio client.
+            hr = m_pAudioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 10000000, 0, m_pFormat, NULL);
+            if (FAILED(hr)) {
+                throw std::runtime_error("Failed to initialize audio client.");
+            }
+
+            // Start the audio client.
+            hr = m_pAudioClient->Start();
+            if (FAILED(hr)) {
+                throw std::runtime_error("Failed to start audio client.");
+            }
+
+            // Get the capture client.
+            hr = m_pAudioClient->GetService(__uuidof(IAudioCaptureClient), (void**)&m_pCaptureClient);
+            if (FAILED(hr)) {
+                throw std::runtime_error("Failed to get capture client.");
+            }
+        }
     }
 
     ~CiAudio() {
@@ -184,5 +212,53 @@ public:
 
         return info.str();
     }
+
+    // Method to read audio data
+    void readAudioData() {
+        if (m_pCaptureClient == nullptr) {
+            throw std::runtime_error("Capture client is not initialized.");
+        }
+
+        // Create a child thread to read audio data
+        std::thread t([this] {
+            UINT32 packetLength = 0;
+            BYTE* pData;
+            UINT32 numFramesAvailable;
+            DWORD flags;
+
+            // Read audio data in batches of 128 audio frames
+            for (int i = 0; i < 16; i++) { // 16*128 frames = 2048 frames ~ 2 seconds
+                HRESULT hr = m_pCaptureClient->GetNextPacketSize(&packetLength);
+                if (FAILED(hr)) {
+                    throw std::runtime_error("Failed to get next packet size.");
+                }
+
+                while (packetLength != 0) {
+                    hr = m_pCaptureClient->GetBuffer(&pData, &numFramesAvailable, &flags, NULL, NULL);
+                    if (FAILED(hr)) {
+                        throw std::runtime_error("Failed to get buffer.");
+                    }
+
+                    // Process audio data here...
+                    float* pAudioData = reinterpret_cast<float*>(pData);
+                    m_audioData.insert(m_audioData.end(), pAudioData, pAudioData + numFramesAvailable * 2);
+
+                    hr = m_pCaptureClient->ReleaseBuffer(numFramesAvailable);
+                    if (FAILED(hr)) {
+                        throw std::runtime_error("Failed to release buffer.");
+                    }
+
+                    hr = m_pCaptureClient->GetNextPacketSize(&packetLength);
+                    if (FAILED(hr)) {
+                        throw std::runtime_error("Failed to get next packet size.");
+                    }
+                }
+            }
+        });
+
+        // Detach the thread
+        t.detach();
+    }
+
 
 };
