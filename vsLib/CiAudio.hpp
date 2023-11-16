@@ -37,7 +37,7 @@ private:
     std::vector<float> m_audioData;
 
 public:
-    CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_sizeAudioClientNo(-1) {
+    CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), m_sizeAudioClientNo(-1) {
         // Initialize COM library using RAII.
         HRESULT hr = CoInitialize(nullptr);
         if (FAILED(hr)) {
