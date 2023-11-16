@@ -1,5 +1,5 @@
-#include <iostream>
 #include "CiAudio.hpp"
+#include <iostream>
 
 int main() {
 
@@ -9,22 +9,28 @@ int main() {
         std::wcout << audio.getAudioEndpointsInfo();
 
         // Activate the first endpoint 1
-       audio.activateEndpointByIndex(1);
-       std::wcout << audio.getStreamFormatInfo();
+        audio.activateEndpointByIndex(1);
+        std::wcout << audio.getStreamFormatInfo();
 
-       // Read audio data
-       audio.readAudioData();
+        // Read audio data
+        audio.readAudioData();
 
-       // Wait for a while to let the child thread finish reading audio data
-       std::this_thread::sleep_for(std::chrono::seconds(1));
+        // Wait for a while to let the child thread finish reading audio data
+        std::this_thread::sleep_for(std::chrono::seconds(10));
 
-       // Get the read audio data
-       const std::vector<float>& audioData = audio.getAudioData();
+        // Get the read audio data
+        std::queue<float> audioData = audio.getAudioData();
 
-       // Print data points
-       for (size_t i = 0; i < audioData.size(); i += 2 ) {
-           std::cout << "[" << i/2 << "] " << audioData[i] << "   " << audioData[i+1] << std::endl;
-       }
+        // Print data points
+        size_t i = 0;
+        while (!audioData.empty()) {
+            std::cout << "[" << i << "] ";
+            std::cout << audioData.front() << "    ";
+            audioData.pop();
+            std::cout << audioData.front() << "\n";
+            audioData.pop();
+            ++i;
+        }
 
     }
 

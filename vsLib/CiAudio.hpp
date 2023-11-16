@@ -4,11 +4,12 @@
 #include <string>
 #include <sstream>
 #include <stdexcept>
-#include <vector>
+//#include <vector>
 #include <memory>
 #include <Audioclient.h>
 #include <Endpointvolume.h>
 #include <thread>
+#include <queue>
 
 class CiAudio {
 private:
@@ -33,8 +34,8 @@ private:
     // Pointer to the IAudioCaptureClient interface.
     IAudioCaptureClient* m_pCaptureClient;
 
-    // Vector to accumulate the read audio data.
-    std::vector<float> m_audioData;
+    // Queue to accumulate the read audio data.
+    std::queue<float> m_audioData;
 
 public:
     CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), m_sizeAudioClientNo(-1) {
@@ -89,7 +90,7 @@ public:
     }
 
     // Getter for the audio data
-    std::vector<float> getAudioData() const {
+    std::queue<float> getAudioData() const {
         return m_audioData;
     }
 
@@ -227,7 +228,7 @@ public:
             DWORD flags;
 
             // Read audio data in batches of 128 audio frames
-            for (int i = 0; i < 16; i++) { // 16*128 frames = 2048 frames ~ 2 seconds
+            for (int i = 0; i < 1; i++) { // 16*128 frames = 2048 frames ~ 2 seconds
                 HRESULT hr = m_pCaptureClient->GetNextPacketSize(&packetLength);
                 if (FAILED(hr)) {
                     throw std::runtime_error("Failed to get next packet size.");
@@ -241,7 +242,9 @@ public:
 
                     // Process audio data here...
                     float* pAudioData = reinterpret_cast<float*>(pData);
-                    m_audioData.insert(m_audioData.end(), pAudioData, pAudioData + numFramesAvailable * 2);
+                    for (UINT32 i = 0; i < numFramesAvailable * 2; ++i) {
+                        m_audioData.push(pAudioData[i]);
+                    }
 
                     hr = m_pCaptureClient->ReleaseBuffer(numFramesAvailable);
                     if (FAILED(hr)) {
@@ -254,11 +257,13 @@ public:
                     }
                 }
             }
-        });
+            });
 
         // Detach the thread
         t.detach();
     }
+
+
 
 
 };
