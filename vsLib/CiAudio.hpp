@@ -229,53 +229,54 @@ public:
     }
 
 	// Method to read audio data
-	void readAudioData() {
+    void readAudioData() {
 
-		if (m_pCaptureClient == nullptr) {
-			throw std::runtime_error("Capture client is not initialized.");
-		}
+        if (m_pCaptureClient == nullptr) {
+            throw std::runtime_error("Capture client is not initialized.");
+        }
 
-		UINT32 packetLength = 0;
-		BYTE* pData;
-		UINT32 numFramesAvailable;
-		DWORD flags;
+        const int targetFrames = 4800; // Target frames for 0.1 second
+        int totalFramesRead = 0;
 
-		// Read audio data in batches of 128 audio frames
-		HRESULT hr = m_pCaptureClient->GetNextPacketSize(&packetLength);
-		if (FAILED(hr)) {
-			throw std::runtime_error("Failed to get next packet size.");
-		}
-        std::cout << "Packet size: " << packetLength << "\n";
+        while (totalFramesRead < targetFrames) {
+            UINT32 packetLength = 0;
+            BYTE* pData;
+            UINT32 numFramesAvailable;
+            DWORD flags;
 
-		while (packetLength != 0) {
-			hr = m_pCaptureClient->GetBuffer(&pData, &numFramesAvailable, &flags, NULL, NULL);
-			if (FAILED(hr)) {
-				throw std::runtime_error("Failed to get buffer.");
-			}
-
-            {
-                // Lock the mutex while modifying the queue
-                std::lock_guard<std::mutex> lock(m_mtx);
-
-                // Process audio data here...
-                AudioCH2F* pAudioData = reinterpret_cast<AudioCH2F*>(pData);
-                for (UINT32 i = 0; i < numFramesAvailable; ++i) {
-                    m_audioData.push(pAudioData[i]);
-                }
+            HRESULT hr = m_pCaptureClient->GetNextPacketSize(&packetLength);
+            if (FAILED(hr)) {
+                throw std::runtime_error("Failed to get next packet size.");
             }
 
-			hr = m_pCaptureClient->ReleaseBuffer(numFramesAvailable);
-			if (FAILED(hr)) {
-				throw std::runtime_error("Failed to release buffer.");
-			}
+            if (packetLength != 0) {
+                hr = m_pCaptureClient->GetBuffer(&pData, &numFramesAvailable, &flags, NULL, NULL);
+                if (FAILED(hr)) {
+                    throw std::runtime_error("Failed to get buffer.");
+                }
 
-			hr = m_pCaptureClient->GetNextPacketSize(&packetLength);
-			if (FAILED(hr)) {
-				throw std::runtime_error("Failed to get next packet size.");
-			}
-            std::cout << "Packet size: " << packetLength << "\n";
-		}
+                {
+                    // Lock the mutex while modifying the queue
+                    std::lock_guard<std::mutex> lock(m_mtx);
 
-	}
+                    // Process audio data here...
+                    AudioCH2F* pAudioData = reinterpret_cast<AudioCH2F*>(pData);
+                    for (UINT32 i = 0; i < numFramesAvailable; ++i) {
+                        m_audioData.push(pAudioData[i]);
+                    }
+                }
+
+                hr = m_pCaptureClient->ReleaseBuffer(numFramesAvailable);
+                if (FAILED(hr)) {
+                    throw std::runtime_error("Failed to release buffer.");
+                }
+
+                totalFramesRead += numFramesAvailable;
+            }
+        }
+
+        // Wait for the remaining audio data to be processed
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 
 };

@@ -15,9 +15,6 @@ int main() {
         // Read audio data
         audio.readAudioData();
 
-        // Wait for a while to let the child thread finish reading audio data
-        //std::this_thread::sleep_for(std::chrono::seconds(10));
-
         // Get the read audio data
         std::queue<AudioCH2F> audioData = audio.getAudioData();
 
