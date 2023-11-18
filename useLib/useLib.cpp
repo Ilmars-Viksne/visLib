@@ -16,18 +16,16 @@ int main() {
         audio.readAudioData();
 
         // Wait for a while to let the child thread finish reading audio data
-        //std::this_thread::sleep_for(std::chrono::seconds(1));
+        //std::this_thread::sleep_for(std::chrono::seconds(10));
 
         // Get the read audio data
-        std::queue<float> audioData = audio.getAudioData();
+        std::queue<AudioCH2F> audioData = audio.getAudioData();
 
         // Print data points
         size_t i = 0;
         while (!audioData.empty()) {
             std::cout << "[" << i << "] ";
-            std::cout << audioData.front() << "    ";
-            audioData.pop();
-            std::cout << audioData.front() << "\n";
+            std::cout << audioData.front().chA << "    " << audioData.front().chB << "\n";
             audioData.pop();
             ++i;
         }

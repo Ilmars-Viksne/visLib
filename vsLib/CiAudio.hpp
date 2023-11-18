@@ -10,7 +10,14 @@
 #include <thread>
 #include <queue>
 #include <iostream>
+#include <mutex>
 
+
+// Define a new structure to hold the audio frrame data
+struct AudioCH2F {
+    float chA;
+    float chB;
+};
 
 class CiAudio {
 private:
@@ -36,7 +43,13 @@ private:
     IAudioCaptureClient* m_pCaptureClient;
 
     // Queue to accumulate the read audio data.
-    std::queue<float> m_audioData;
+    std::queue<AudioCH2F> m_audioData;
+
+    // Mutex for synchronizing access to the queue
+    std::mutex m_mtx;
+
+    // Condition variable for signaling between threads
+    std::condition_variable m_cv;
 
 public:
     CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), m_sizeAudioClientNo(-1) {
@@ -91,7 +104,7 @@ public:
     }
 
     // Getter for the audio data
-    std::queue<float> getAudioData() const {
+    std::queue<AudioCH2F> getAudioData() const {
         return m_audioData;
     }
 
@@ -232,6 +245,7 @@ public:
 		if (FAILED(hr)) {
 			throw std::runtime_error("Failed to get next packet size.");
 		}
+        std::cout << "Packet size: " << packetLength << "\n";
 
 		while (packetLength != 0) {
 			hr = m_pCaptureClient->GetBuffer(&pData, &numFramesAvailable, &flags, NULL, NULL);
@@ -239,11 +253,16 @@ public:
 				throw std::runtime_error("Failed to get buffer.");
 			}
 
-			// Process audio data here...
-			float* pAudioData = reinterpret_cast<float*>(pData);
-			for (UINT32 i = 0; i < numFramesAvailable * 2; ++i) {
-				m_audioData.push(pAudioData[i]);
-			}
+            {
+                // Lock the mutex while modifying the queue
+                std::lock_guard<std::mutex> lock(m_mtx);
+
+                // Process audio data here...
+                AudioCH2F* pAudioData = reinterpret_cast<AudioCH2F*>(pData);
+                for (UINT32 i = 0; i < numFramesAvailable; ++i) {
+                    m_audioData.push(pAudioData[i]);
+                }
+            }
 
 			hr = m_pCaptureClient->ReleaseBuffer(numFramesAvailable);
 			if (FAILED(hr)) {
