@@ -15,18 +15,26 @@ int main() {
         // Read audio data
         audio.readAudioData();
 
-        // Get the read audio data
-        std::queue<AudioCH2F> audioData = audio.getAudioData();
+        size_t nSapleSize = 480;
 
-        // Print data points
-        size_t i = 0;
-        while (!audioData.empty()) {
-            std::cout << "[" << i << "] ";
-            std::cout << audioData.front().chA << "    " << audioData.front().chB << "\n";
-            audioData.pop();
-            ++i;
+        size_t i = 1;
+
+        while (nSapleSize <= audio.getAudioDataSize())
+        {
+            //std::cout << "\nNumber of frames: " << audio.getAudioDataSize() << "\n";
+
+            // Get the read audio data
+            std::tuple<std::vector<float>, std::vector<float>>
+                audioData = audio.moveFirstFrames(nSapleSize);
+
+            // Print data points
+            for (size_t j = 0; j < nSapleSize; j++)
+            {
+                std::cout << "[" << i << "] ";
+                std::cout << std::get<0>(audioData)[j] << "    " << std::get<1>(audioData)[j] << "\n";
+                ++i;
+            }
         }
-
     }
 
     catch (const std::exception& e) {

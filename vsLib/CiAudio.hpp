@@ -9,7 +9,7 @@
 #include <Endpointvolume.h>
 #include <thread>
 #include <queue>
-#include <iostream>
+//#include <iostream>
 #include <mutex>
 
 
@@ -43,7 +43,7 @@ private:
     IAudioCaptureClient* m_pCaptureClient;
 
     // Queue to accumulate the read audio data.
-    std::queue<AudioCH2F> m_audioData;
+    std::vector<AudioCH2F> m_audioData;
 
     // Mutex for synchronizing access to the queue
     std::mutex m_mtx;
@@ -104,9 +104,40 @@ public:
     }
 
     // Getter for the audio data
-    std::queue<AudioCH2F> getAudioData() const {
+    std::vector<AudioCH2F> getAudioData() const {
         return m_audioData;
     }
+
+    // Getter for the audio data size
+    size_t getAudioDataSize() const { 
+        return m_audioData.size(); 
+    }
+
+    // Method to get and remove the N first frames
+    std::tuple<std::vector<float>, std::vector<float>> moveFirstFrames(std::size_t N) {
+
+        std::vector<float> chAData;
+        std::vector<float> chBData;
+
+        {
+            // Lock the mutex while modifying the queue
+            std::lock_guard<std::mutex> lock(m_mtx);
+
+            if (N > m_audioData.size()) {
+                N = m_audioData.size();  // Ensure we don't try to remove more frames than exist
+            }
+
+            for (std::size_t i = 0; i < N; ++i) {
+                chAData.push_back(m_audioData[i].chA);
+                chBData.push_back(m_audioData[i].chB);
+            }
+
+            m_audioData.erase(m_audioData.begin(), m_audioData.begin() + N);  // Remove the N first frames
+        }
+
+        return { chAData, chBData };
+    }
+
 
     // Activate an endpoint by index.
     void activateEndpointByIndex(size_t index) {
@@ -262,7 +293,7 @@ public:
                     // Process audio data here...
                     AudioCH2F* pAudioData = reinterpret_cast<AudioCH2F*>(pData);
                     for (UINT32 i = 0; i < numFramesAvailable; ++i) {
-                        m_audioData.push(pAudioData[i]);
+                        m_audioData.push_back(pAudioData[i]);
                     }
                 }
 
