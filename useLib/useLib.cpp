@@ -13,7 +13,7 @@ int main() {
         std::wcout << audio.getStreamFormatInfo();
 
         // Read audio data
-        audio.readAudioData();
+        audio.readAudioData(0.1f);
 
         size_t nSapleSize = 480;
 

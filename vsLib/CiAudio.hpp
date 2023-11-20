@@ -51,8 +51,12 @@ private:
     // Condition variable for signaling between threads
     std::condition_variable m_cv;
 
+    // Sample rate (Hz)
+    DWORD m_dwSamplesPerSec;
+
 public:
-    CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), m_sizeAudioClientNo(-1) {
+    CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), 
+        m_sizeAudioClientNo(-1), m_dwSamplesPerSec(0) {
         // Initialize COM library using RAII.
         HRESULT hr = CoInitialize(nullptr);
         if (FAILED(hr)) {
@@ -229,7 +233,8 @@ public:
             WAVEFORMATEXTENSIBLE* pFormatExt = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(m_pFormat);
             info << L"Waveform audio format: WAVE_FORMAT_EXTENSIBLE\n";
             info << L"Number of Channels: " << pFormatExt->Format.nChannels << L"\n";
-            info << L"Sample Rate: " << pFormatExt->Format.nSamplesPerSec << L" (Hz)\n";
+            m_dwSamplesPerSec = pFormatExt->Format.nSamplesPerSec;
+            info << L"Sample Rate: " << m_dwSamplesPerSec << L" (Hz)\n";
             info << L"Average Bytes Per Second: " << pFormatExt->Format.nAvgBytesPerSec << L" (B/s)\n";
             info << L"Block Align: " << pFormatExt->Format.nBlockAlign << L" (B)\n";
             info << L"Bits Per Sample: " << pFormatExt->Format.wBitsPerSample << L" (bit)\n";
@@ -249,7 +254,8 @@ public:
         else {
             info << L"Format: " << m_pFormat->wFormatTag << L"\n";
             info << L"Channels: " << m_pFormat->nChannels << L"\n";
-            info << L"Sample Rate: " << m_pFormat->nSamplesPerSec << L" (Hz)\n";
+            m_dwSamplesPerSec = m_pFormat->nSamplesPerSec;
+            info << L"Sample Rate: " << m_dwSamplesPerSec << L" (Hz)\n";
             info << L"Average Bytes Per Second: " << m_pFormat->nAvgBytesPerSec << L" (B/s)\n";
             info << L"Block Align: " << m_pFormat->nBlockAlign << L" (B)\n";
             info << L"Bits Per Sample: " << m_pFormat->wBitsPerSample << L" (bit)\n";
@@ -260,13 +266,18 @@ public:
     }
 
 	// Method to read audio data
-    void readAudioData() {
+    void readAudioData(float time = 0.1f) {
 
         if (m_pCaptureClient == nullptr) {
             throw std::runtime_error("Capture client is not initialized.");
         }
 
-        const int targetFrames = 4800; // Target frames for 0.1 second
+        if (m_dwSamplesPerSec < 1) {
+            throw std::runtime_error("Sample rate of the audio endpoint < 1.");
+        }
+
+        // Target frames for time seconds
+        const int targetFrames = static_cast<int> (time * m_dwSamplesPerSec); // Target frames for 0.1 second
         int totalFramesRead = 0;
 
         while (totalFramesRead < targetFrames) {
