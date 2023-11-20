@@ -20,6 +20,17 @@ void printPower(const float* spectrumPower, const int sampleSize, const float sa
     }
 }
 
+void printPowerRange(const float* spectrumPower, const int sampleSize, const float samplingFrequency, int nMin, int nMax) {
+    printf("-----------------------------------\n");
+    printf(" Frequency | Index  |    Power   \n");
+    printf("-----------------------------------\n");
+
+    for (int i = nMin; i <= nMax; ++i) {
+        float freq = i * samplingFrequency / sampleSize;
+        printf("%10.2f | %6d | %10.6f\n", freq, i, spectrumPower[i]);
+    }
+}
+
 
 
 int goCiAudioV01() {

@@ -9,7 +9,6 @@
 #include <Endpointvolume.h>
 #include <thread>
 #include <queue>
-//#include <iostream>
 #include <mutex>
 
 
@@ -115,6 +114,11 @@ public:
     // Getter for the audio data size
     size_t getAudioDataSize() const { 
         return m_audioData.size(); 
+    }
+
+    // Getter for sample rate of the audio endpoint
+    DWORD getSamplesPerSec() const {
+        return m_dwSamplesPerSec;
     }
 
     // Method to get and remove the N first frames
@@ -280,7 +284,7 @@ public:
         const int targetFrames = static_cast<int> (time * m_dwSamplesPerSec); // Target frames for 0.1 second
         int totalFramesRead = 0;
 
-        while (totalFramesRead < targetFrames) {
+        while (totalFramesRead <= targetFrames) {
             UINT32 packetLength = 0;
             BYTE* pData;
             UINT32 numFramesAvailable;
