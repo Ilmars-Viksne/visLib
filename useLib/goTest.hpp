@@ -31,7 +31,16 @@ void printPowerRange(const float* spectrumPower, const int sampleSize, const flo
     }
 }
 
+void printPowerRange2Ch(const float* spectrumPowerA, const float* spectrumPowerB, const int sampleSize, const float samplingFrequency, int nMin, int nMax) {
+    printf("----------------------------------------------\n");
+    printf(" Frequency | Index  |   Power A  |   Power B\n");
+    printf("----------------------------------------------\n");
 
+    for (int i = nMin; i <= nMax; ++i) {
+        float freq = i * samplingFrequency / sampleSize;
+        printf("%10.2f | %6d | %10.6f | %10.6f\n", freq, i, spectrumPowerA[i], spectrumPowerB[i]);
+    }
+}
 
 int goCiAudioV01() {
 

@@ -8,12 +8,10 @@
 int main() {
 
     const int nSampleSize = 2048;
-
     cl_int err{ 0 };
     CiCLaDft oDft;
 
     try {
-
         // Create an instance of CiAudio
         CiAudio audio;
         std::wcout << audio.getAudioEndpointsInfo();
@@ -40,21 +38,24 @@ int main() {
         err = oDft.createOpenCLKernel(nSampleSize, oDft.P1SN);
         if (err != CL_SUCCESS) return 1;
 
-        std::vector<float> inputReal(nSampleSize);
-        std::vector<float> onesidePower(oDft.getOnesideSize());
+        std::vector<float> onesidePowerA(oDft.getOnesideSize());
+        std::vector<float> onesidePowerB(oDft.getOnesideSize());
 
         size_t i = 1;
 
         while (nSampleSize <= audio.getAudioDataSize())
         {
-
             // Get the read audio data
             std::tuple<std::vector<float>, std::vector<float>>
                 audioData = audio.moveFirstFrames(nSampleSize);
 
-            inputReal = std::get<0>(audioData);
+            err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
+            if (err != CL_SUCCESS) {
+                oDft.releaseOpenCLResources();
+                return 1;
+            }
 
-            err = oDft.executeOpenCLKernel(inputReal.data(), onesidePower.data());
+            err = oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
             if (err != CL_SUCCESS) {
                 oDft.releaseOpenCLResources();
                 return 1;
@@ -64,17 +65,13 @@ int main() {
 
             // Move the cursor to the beginning of the console
             std::cout << "\033[0;0H";
-            if (oDft.getKernelNo() == oDft.P1S) std::cout << "\nOne-Sided Power Spectrum after ";
-            if (oDft.getKernelNo() == oDft.P1SN) std::cout << "\nNormalized One-Sided Power Spectrum after ";
+            std::cout << "\n   Normalized One-Sided Power Spectrum after ";
             std::cout << std::fixed << std::setprecision(6) << nSampleSize /samplingFrequency * i << " seconds:\n";
-            printPowerRange(onesidePower.data(), nSampleSize, samplingFrequency, 0, 40);
+            printPowerRange2Ch(onesidePowerA.data(), onesidePowerB.data(), nSampleSize, samplingFrequency, 0, 40);
 
             ++i;
-
         }
-
         oDft.releaseOpenCLResources();
-
     }
 
     catch (const OpenCLException& e) {
@@ -82,6 +79,7 @@ int main() {
         oDft.releaseOpenCLResources();
         return 1;
     }
+
     catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
     }
