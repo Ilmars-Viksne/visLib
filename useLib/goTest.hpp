@@ -3,6 +3,9 @@
 #include "CiCLaDft.hpp"
 #include "CiAudio.hpp"
 
+#include <conio.h>
+#include <iomanip>
+
 /// <summary>
 /// Print the power spectrum to the console.
 /// </summary>
@@ -40,6 +43,88 @@ void printPowerRange2Ch(const float* spectrumPowerA, const float* spectrumPowerB
         float freq = i * samplingFrequency / sampleSize;
         printf("%10.2f | %6d | %10.6f | %10.6f\n", freq, i, spectrumPowerA[i], spectrumPowerB[i]);
     }
+}
+
+int goCiAudioStereo() {
+
+    const int nSampleSize = 2048;
+    cl_int err{ 0 };
+    CiCLaDft oDft;
+
+    try {
+        // Create an instance of CiAudio
+        CiAudio audio;
+        std::wcout << audio.getAudioEndpointsInfo();
+
+        // Activate the first endpoint 1
+        audio.activateEndpointByIndex(1);
+        std::wcout << audio.getStreamFormatInfo();
+
+        const float samplingFrequency = static_cast<float>(audio.getSamplesPerSec());
+        std::cout << "\nSample Size: " << nSampleSize << "  Sampling Frequency: " << samplingFrequency << "\n\n";
+
+        std::cout << "\nPress any key to continue . . .\n";
+        int nR = _getch();  // Wait for any key press
+
+        // Clear the console
+        std::cout << "\033c";
+
+        // Read audio data
+        audio.readAudioData(2.0f);
+
+        err = oDft.setOpenCL();
+        if (err != CL_SUCCESS) return 1;
+
+        err = oDft.createOpenCLKernel(nSampleSize, oDft.P1SN);
+        if (err != CL_SUCCESS) return 1;
+
+        std::vector<float> onesidePowerA(oDft.getOnesideSize());
+        std::vector<float> onesidePowerB(oDft.getOnesideSize());
+
+        size_t i = 1;
+
+        while (nSampleSize <= audio.getAudioDataSize())
+        {
+            // Get the read audio data
+            std::tuple<std::vector<float>, std::vector<float>>
+                audioData = audio.moveFirstFrames(nSampleSize);
+
+            err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
+            if (err != CL_SUCCESS) {
+                oDft.releaseOpenCLResources();
+                return 1;
+            }
+
+            err = oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
+            if (err != CL_SUCCESS) {
+                oDft.releaseOpenCLResources();
+                return 1;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+            // Move the cursor to the beginning of the console
+            std::cout << "\033[0;0H";
+            std::cout << "\n   Normalized One-Sided Power Spectrum after ";
+            std::cout << std::fixed << std::setprecision(6) << nSampleSize / samplingFrequency * i << " seconds:\n";
+            printPowerRange2Ch(onesidePowerA.data(), onesidePowerB.data(), nSampleSize, samplingFrequency, 0, 40);
+
+            ++i;
+        }
+        oDft.releaseOpenCLResources();
+    }
+
+    catch (const OpenCLException& e) {
+        std::cerr << "OpenCL Error: " << e.what() << " (Error Code: " << e.getErrorCode() << ")" << std::endl;
+        oDft.releaseOpenCLResources();
+        return 1;
+    }
+
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << '\n';
+    }
+
+    return 0;
 }
 
 int goCiAudioV01() {
@@ -84,7 +169,6 @@ int goCiAudioV01() {
 
     return 0;
 }
-
 
 int goCiCLaDft()
 {
