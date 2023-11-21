@@ -5,54 +5,98 @@
 #include <conio.h>
 #include <iomanip>
 
-void processAudioData(CiAudio& audio, const int nSampleSize, const float samplingFrequency) {
-    cl_int err{ 0 };
+class CiAudioDft : public CiAudio {
 
-    // Create an instance of CiCLaDft
-    CiCLaDft oDft;
+private:
 
-    err = oDft.setOpenCL();
-    if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to initialize OpenCL resources.");
+    int m_nIndexMinF;
+    int m_nIndexMaxF;
 
-    err = oDft.createOpenCLKernel(nSampleSize, oDft.P1SN);
-    if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to create an OpenCL kernel.");
+public:
 
-    std::vector<float> onesidePowerA(oDft.getOnesideSize());
-    std::vector<float> onesidePowerB(oDft.getOnesideSize());
+    // Constructor to initialize class variables
+    CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0) {}
 
-    size_t i = 1;
-
-    while (nSampleSize <= audio.getAudioDataSize())
-    {
-        // Get the read audio data
-        std::tuple<std::vector<float>, std::vector<float>>
-            audioData = audio.moveFirstFrames(nSampleSize);
-
-        err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
-        if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
-
-        err = oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
-        if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for B.");
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-
-        // Move the cursor to the beginning of the console
-        std::cout << "\033[0;0H";
-        std::cout << "\n   Normalized One-Sided Power Spectrum after ";
-        std::cout << std::fixed << std::setprecision(6) << nSampleSize / samplingFrequency * i << " seconds:\n";
-        printPowerRange2Ch(onesidePowerA.data(), onesidePowerB.data(), nSampleSize, samplingFrequency, 0, 40);
-
-        ++i;
+    // Setter for m_nIndexMinF and m_nIndexMaxF
+    void setIndexRangeF(const int nIndexMinF, const int nIndexMaxF) {
+        m_nIndexMinF = nIndexMinF; 
+        m_nIndexMaxF = nIndexMaxF;
     }
-    oDft.releaseOpenCLResources();
-}
+
+    // Getter for m_nIndexMinF
+    int getIndexMinF() const { return m_nIndexMinF; }
+
+    // Getter for m_nIndexMaxF
+    int getIndexMaxF() const { return m_nIndexMaxF; }
+
+    void processAudioData(const int nSampleSize) {
+
+        if (m_dwSamplesPerSec < 1) {
+            throw std::runtime_error("Sample rate of the audio endpoint < 1.");
+        }
+
+        cl_int err{ 0 };
+
+        // Create an instance of CiCLaDft
+        CiCLaDft oDft;
+
+        err = oDft.setOpenCL();
+        if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to initialize OpenCL resources.");
+
+        err = oDft.createOpenCLKernel(nSampleSize, oDft.P1SN);
+        if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to create an OpenCL kernel.");
+
+        std::vector<float> onesidePowerA(oDft.getOnesideSize());
+        std::vector<float> onesidePowerB(oDft.getOnesideSize());
+
+        size_t i = 1;
+
+        float fpDt = nSampleSize / static_cast<float>(m_dwSamplesPerSec);
+
+        while (true)
+        {
+            // Get the read audio data
+            std::tuple<std::vector<float>, std::vector<float>>
+                audioData = moveFirstSample();
+
+            if (nSampleSize > getAudioDataSize()) break;
+
+            err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
+            if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
+
+            err = oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
+            if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for B.");
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+            // Move the cursor to the beginning of the console
+            printf("\033[0;0H");
+
+            printf("\n  Normalized One-Sided Power Spectrum after ");
+            printf(" %10.6f seconds:\n", fpDt * i);
+            printf("----------------------------------------------\n");
+            printf(" Frequency | Index  |   Power A  |   Power B\n");
+            printf("----------------------------------------------\n");
+
+            for (int i = m_nIndexMinF; i <= m_nIndexMaxF; ++i) {
+                float freq = i * static_cast<float>(m_dwSamplesPerSec) / nSampleSize;
+                printf("%10.2f | %6d | %10.6f | %10.6f\n", freq, i, onesidePowerA.data()[i], onesidePowerB.data()[i]);
+            }
+
+            ++i;
+        }
+        oDft.releaseOpenCLResources();
+    }
+};
+
 
 int main() {
     const int nSampleSize = 2048;
 
     try {
-        // Create an instance of CiAudio
-        CiAudio audio;
+        // Create an instance of CiAudioDft
+        CiAudioDft audio;
+        audio.setIndexRangeF(0, 40);
         std::wcout << audio.getAudioEndpointsInfo();
 
         // Activate the first endpoint 1
@@ -69,11 +113,11 @@ int main() {
         std::cout << "\033c";
 
         // Read audio data in a new thread
-        std::thread t1(&CiAudio::readAudioData, &audio, 30.0f);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::thread t1(&CiAudioDft::readAudioData, &audio, 20.0f);
+        //std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Process the audio data in a new thread
-        std::thread t2(processAudioData, std::ref(audio), nSampleSize, samplingFrequency);
+        std::thread t2(&CiAudioDft::processAudioData, &audio, nSampleSize);
 
         // Wait for both threads to finish
         t1.join();

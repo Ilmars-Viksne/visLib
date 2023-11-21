@@ -44,14 +44,15 @@ private:
     // Queue to accumulate the read audio data.
     std::vector<AudioCH2F> m_audioData;
 
+protected:
+    // Sample rate (Hz)
+    DWORD m_dwSamplesPerSec;
+
     // Mutex for synchronizing access to the queue
     std::mutex m_mtx;
 
     // Condition variable for signaling between threads
     std::condition_variable m_cv;
-
-    // Sample rate (Hz)
-    DWORD m_dwSamplesPerSec;
 
 public:
     CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), 
@@ -145,6 +146,36 @@ public:
 
         return { chAData, chBData };
     }
+
+
+    // Method to get and remove the first sample frames
+    std::tuple<std::vector<float>, std::vector<float>> moveFirstSample() {
+
+        std::size_t N = 2048;
+
+        std::vector<float> chAData;
+        std::vector<float> chBData;
+
+        {
+            // Lock the mutex while modifying the queue
+            std::unique_lock<std::mutex> lock(m_mtx);
+            if (N > m_audioData.size()) m_cv.wait(lock);
+
+            if (N > m_audioData.size()) {
+                N = m_audioData.size();  // Ensure we don't try to remove more frames than exist
+            }
+
+            for (std::size_t i = 0; i < N; ++i) {
+                chAData.push_back(m_audioData[i].chA);
+                chBData.push_back(m_audioData[i].chB);
+            }
+
+            m_audioData.erase(m_audioData.begin(), m_audioData.begin() + N);  // Remove the N first frames
+        }
+
+        return { chAData, chBData };
+    }
+
 
 
     // Activate an endpoint by index.
@@ -270,7 +301,7 @@ public:
     }
 
 	// Method to read audio data
-    void readAudioData(float time = 0.1f) {
+    void readAudioData(const float fpTime = 0.1f) {
 
         if (m_pCaptureClient == nullptr) {
             throw std::runtime_error("Capture client is not initialized.");
@@ -281,7 +312,7 @@ public:
         }
 
         // Target frames for time seconds
-        const int targetFrames = static_cast<int> (time * m_dwSamplesPerSec); // Target frames for 0.1 second
+        const int targetFrames = static_cast<int> (fpTime * m_dwSamplesPerSec); // Target frames for 0.1 second
         int totalFramesRead = 0;
 
         while (totalFramesRead <= targetFrames) {
@@ -310,6 +341,8 @@ public:
                     for (UINT32 i = 0; i < numFramesAvailable; ++i) {
                         m_audioData.push_back(pAudioData[i]);
                     }
+
+                    if (m_audioData.size() >= 2*2048) m_cv.notify_one();
                 }
 
                 hr = m_pCaptureClient->ReleaseBuffer(numFramesAvailable);
@@ -321,8 +354,10 @@ public:
             }
         }
 
+        m_cv.notify_one();
+
         // Wait for the remaining audio data to be processed
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
 };
