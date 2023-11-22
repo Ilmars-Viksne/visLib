@@ -52,14 +52,15 @@ public:
         size_t i = 1;
 
         float fpDt = nSampleSize / static_cast<float>(m_dwSamplesPerSec);
+        //float fpTime = 0.0f;
 
-        while (true)
+        do
         {
             // Get the read audio data
             std::tuple<std::vector<float>, std::vector<float>>
                 audioData = moveFirstSample();
 
-            if (nSampleSize > getAudioDataSize()) break;
+            if (nSampleSize > getAudioDataSize()) continue;
 
             err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
@@ -70,10 +71,10 @@ public:
             std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
             // Move the cursor to the beginning of the console
+            //fpTime = i * fpDt;
             printf("\033[0;0H");
-
             printf("\n  Normalized One-Sided Power Spectrum after ");
-            printf(" %10.6f seconds:\n", fpDt * i);
+            printf(" %10.6f seconds:\n", i * fpDt);
             printf("----------------------------------------------\n");
             printf(" Frequency | Index  |   Power A  |   Power B\n");
             printf("----------------------------------------------\n");
@@ -84,7 +85,9 @@ public:
             }
 
             ++i;
-        }
+
+        } while (m_nMessageID == AM_DATASTART || nSampleSize >= getAudioDataSize());
+
         oDft.releaseOpenCLResources();
     }
 };
@@ -113,7 +116,7 @@ int main() {
         std::cout << "\033c";
 
         // Read audio data in a new thread
-        std::thread t1(&CiAudioDft::readAudioData, &audio, 20.0f);
+        std::thread t1(&CiAudioDft::readAudioData, &audio, 10.0f);
         //std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Process the audio data in a new thread

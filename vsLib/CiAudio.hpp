@@ -54,9 +54,17 @@ protected:
     // Condition variable for signaling between threads
     std::condition_variable m_cv;
 
+    // Message ID
+    int m_nMessageID;
+
 public:
+
+    const int AM_STARTED = 1;
+    const int AM_DATASTART = 11;
+    const int AM_DATAEND = 12;
+
     CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), 
-        m_sizeAudioClientNo(-1), m_dwSamplesPerSec(0) {
+        m_sizeAudioClientNo(-1), m_dwSamplesPerSec(0), m_nMessageID(1) {
         // Initialize COM library using RAII.
         HRESULT hr = CoInitialize(nullptr);
         if (FAILED(hr)) {
@@ -122,6 +130,11 @@ public:
         return m_dwSamplesPerSec;
     }
 
+    // Getter for message ID
+    int getMessageID() const{
+        return m_nMessageID;
+    }
+
     // Method to get and remove the N first frames
     std::tuple<std::vector<float>, std::vector<float>> moveFirstFrames(std::size_t N) {
 
@@ -161,9 +174,7 @@ public:
             std::unique_lock<std::mutex> lock(m_mtx);
             if (N > m_audioData.size()) m_cv.wait(lock);
 
-            if (N > m_audioData.size()) {
-                N = m_audioData.size();  // Ensure we don't try to remove more frames than exist
-            }
+            if (N > m_audioData.size()) return { chAData, chBData };
 
             for (std::size_t i = 0; i < N; ++i) {
                 chAData.push_back(m_audioData[i].chA);
@@ -315,6 +326,8 @@ public:
         const int targetFrames = static_cast<int> (fpTime * m_dwSamplesPerSec); // Target frames for 0.1 second
         int totalFramesRead = 0;
 
+        m_nMessageID = AM_DATASTART;
+
         while (totalFramesRead <= targetFrames) {
             UINT32 packetLength = 0;
             BYTE* pData;
@@ -354,6 +367,7 @@ public:
             }
         }
 
+        m_nMessageID = AM_DATAEND;
         m_cv.notify_one();
 
         // Wait for the remaining audio data to be processed
