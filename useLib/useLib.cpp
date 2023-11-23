@@ -91,32 +91,52 @@ public:
     }
 };
 
-
 int main() {
-    const int nSampleSize = 2048;
+
 
     try {
         // Create an instance of CiAudioDft
         CiAudioDft audio;
-        audio.setBatchSize(nSampleSize);
-        audio.setIndexRangeF(0, 40);
         std::wcout << audio.getAudioEndpointsInfo();
 
-        // Activate the first endpoint 1
-        audio.activateEndpointByIndex(1);
+        // Get endpoint number from user
+        int endpointNumber;
+        std::cout << "Please enter the endpoint number: ";
+        std::cin >> endpointNumber;
+
+        // Activate the endpoint
+        audio.activateEndpointByIndex(endpointNumber);
         std::wcout << audio.getStreamFormatInfo();
+
+        // Get sample size from user
+        int nSampleSize;
+        std::cout << "Please enter the sample size (2^n): ";
+        std::cin >> nSampleSize;
+
+        // Get time from user
+        float fpTime;
+        std::cout << "Please enter the time: ";
+        std::cin >> fpTime;
+
+        audio.setBatchSize(nSampleSize);
+        audio.setIndexRangeF(0, 40);
 
         const float samplingFrequency = static_cast<float>(audio.getSamplesPerSec());
         std::cout << "\nSample Size: " << nSampleSize << "  Sampling Frequency: " << samplingFrequency << "\n\n";
 
-        std::cout << "\nPress any key to continue . . .\n";
+        std::cout << "\nPress any key to continue, or 'Esc' to exit . . .\n";
         int nR = _getch();  // Wait for any key press
+
+        // Check if the key pressed was 'Esc'
+        if (nR == 27) {
+            return 0;  // Exit the program
+        }
 
         // Clear the console
         std::cout << "\033c";
 
         // Read audio data in a new thread
-        std::thread t1(&CiAudioDft::readAudioData, &audio, 50.0f);
+        std::thread t1(&CiAudioDft::readAudioData, &audio, fpTime);
 
         // Process the audio data in a new thread
         std::thread t2(&CiAudioDft::processAudioData, &audio);
