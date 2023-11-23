@@ -60,7 +60,7 @@ public:
                 audioData = moveFirstSample();
 
             if (m_sizeBatch > std::get<0>(audioData).size()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                //std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 continue;
             }
 
@@ -73,14 +73,14 @@ public:
             // Move the cursor to the beginning of the console
             printf("\033[0;0H");
             printf("\n  Normalized One-Sided Power Spectrum after ");
-            printf(" %10.6f seconds:\n", i * dbDt);
+            printf(" %10.6f seconds (frames left: %6d)\n", i * dbDt, static_cast<int>(getAudioDataSize()));
             printf("----------------------------------------------\n");
             printf(" Frequency | Index  |   Power A  |   Power B\n");
             printf("----------------------------------------------\n");
 
-            for (int i = m_nIndexMinF; i <= m_nIndexMaxF; ++i) {
-                float freq = i * static_cast<float>(m_dwSamplesPerSec) / m_sizeBatch;
-                printf("%10.2f | %6d | %10.6f | %10.6f\n", freq, i, onesidePowerA.data()[i], onesidePowerB.data()[i]);
+            for (int j = m_nIndexMinF; j <= m_nIndexMaxF; ++j) {
+                float freq = j * static_cast<float>(m_dwSamplesPerSec) / m_sizeBatch;
+                printf("%10.2f | %6d | %10.6f | %10.6f\n", freq, j, onesidePowerA.data()[j], onesidePowerB.data()[j]);
             }
 
             ++i;
@@ -122,7 +122,7 @@ int main() {
         audio.setIndexRangeF(0, 40);
 
         const float samplingFrequency = static_cast<float>(audio.getSamplesPerSec());
-        std::cout << "\nSample Size: " << nSampleSize << "  Sampling Frequency: " << samplingFrequency << "\n\n";
+        std::cout << "\nSample Size: " << nSampleSize << "  Sampling Frequency: " << samplingFrequency << "\n";
 
         std::cout << "\nPress any key to continue, or 'Esc' to exit . . .\n";
         int nR = _getch();  // Wait for any key press
