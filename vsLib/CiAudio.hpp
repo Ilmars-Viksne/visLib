@@ -57,6 +57,9 @@ protected:
     // Message ID
     int m_nMessageID;
 
+    // Audio frame batch size equal to sample size for further processing
+    size_t m_sizeBatch;
+
 public:
 
     const int AM_STARTED = 1;
@@ -64,7 +67,7 @@ public:
     const int AM_DATAEND = 12;
 
     CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), 
-        m_sizeAudioClientNo(-1), m_dwSamplesPerSec(0), m_nMessageID(1) {
+        m_sizeAudioClientNo(-1), m_dwSamplesPerSec(0), m_nMessageID(1), m_sizeBatch(0) {
         // Initialize COM library using RAII.
         HRESULT hr = CoInitialize(nullptr);
         if (FAILED(hr)) {
@@ -135,6 +138,16 @@ public:
         return m_nMessageID;
     }
 
+    // Getter for audio frame batch size
+    size_t getBatchSize() const {
+        return m_sizeBatch;
+    }
+
+    // Setter for audio frame batch size
+    void setBatchSize(const size_t sizeBatch) {
+       m_sizeBatch = sizeBatch;
+    }
+
     // Method to get and remove the N first frames
     std::tuple<std::vector<float>, std::vector<float>> moveFirstFrames(std::size_t N) {
 
@@ -160,11 +173,8 @@ public:
         return { chAData, chBData };
     }
 
-
     // Method to get and remove the first sample frames
     std::tuple<std::vector<float>, std::vector<float>> moveFirstSample() {
-
-        std::size_t N = 2048;
 
         std::vector<float> chAData;
         std::vector<float> chBData;
@@ -173,23 +183,18 @@ public:
             // Lock the mutex while modifying the queue
             std::lock_guard<std::mutex> lock(m_mtx);
 
-            //std::unique_lock<std::mutex> lock(m_mtx);
-            //if (N > m_audioData.size()) m_cv.wait(lock);
+            if (m_sizeBatch > m_audioData.size()) return { chAData, chBData };
 
-            if (N > m_audioData.size()) return { chAData, chBData };
-
-            for (std::size_t i = 0; i < N; ++i) {
+            for (std::size_t i = 0; i < m_sizeBatch; ++i) {
                 chAData.push_back(m_audioData[i].chA);
                 chBData.push_back(m_audioData[i].chB);
             }
 
-            m_audioData.erase(m_audioData.begin(), m_audioData.begin() + N);  // Remove the N first frames
+            m_audioData.erase(m_audioData.begin(), m_audioData.begin() + m_sizeBatch);  // Remove the N first frames
         }
 
         return { chAData, chBData };
     }
-
-
 
     // Activate an endpoint by index.
     void activateEndpointByIndex(size_t index) {
@@ -357,7 +362,7 @@ public:
                         m_audioData.push_back(pAudioData[i]);
                     }
 
-                    if (m_audioData.size() >= 2048) m_cv.notify_one();
+                    if (m_audioData.size() >= m_sizeBatch) m_cv.notify_one();
                 }
 
                 hr = m_pCaptureClient->ReleaseBuffer(numFramesAvailable);

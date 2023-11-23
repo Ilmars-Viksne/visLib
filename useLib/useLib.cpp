@@ -105,6 +105,7 @@ int main() {
     try {
         // Create an instance of CiAudioDft
         CiAudioDft audio;
+        audio.setBatchSize(nSampleSize);
         audio.setIndexRangeF(0, 40);
         std::wcout << audio.getAudioEndpointsInfo();
 
@@ -122,7 +123,7 @@ int main() {
         std::cout << "\033c";
 
         // Read audio data in a new thread
-        std::thread t1(&CiAudioDft::readAudioData, &audio, 30.0f);
+        std::thread t1(&CiAudioDft::readAudioData, &audio, 10.0f);
         //std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Process the audio data in a new thread
