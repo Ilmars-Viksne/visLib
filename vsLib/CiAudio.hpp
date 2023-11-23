@@ -11,7 +11,6 @@
 #include <queue>
 #include <mutex>
 
-
 // Define a new structure to hold the audio frrame data
 struct AudioCH2F {
     float chA;

@@ -29,7 +29,7 @@ public:
     // Getter for m_nIndexMaxF
     int getIndexMaxF() const { return m_nIndexMaxF; }
 
-    void processAudioData(const int nSampleSize) {
+    void processAudioData() {
 
         if (m_dwSamplesPerSec < 1) {
             throw std::runtime_error("Sample rate of the audio endpoint < 1.");
@@ -43,7 +43,7 @@ public:
         err = oDft.setOpenCL();
         if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to initialize OpenCL resources.");
 
-        err = oDft.createOpenCLKernel(nSampleSize, oDft.P1SN);
+        err = oDft.createOpenCLKernel(static_cast<int>(m_sizeBatch), oDft.P1SN);
         if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to create an OpenCL kernel.");
 
         std::vector<float> onesidePowerA(oDft.getOnesideSize());
@@ -51,7 +51,7 @@ public:
 
         size_t i = 1;
 
-        double dbDt = nSampleSize / static_cast<double>(m_dwSamplesPerSec);
+        double dbDt = m_sizeBatch / static_cast<double>(m_dwSamplesPerSec);
 
         do
         {
@@ -59,20 +59,16 @@ public:
             std::tuple<std::vector<float>, std::vector<float>>
                 audioData = moveFirstSample();
 
-
-            if (nSampleSize > std::get<0>(audioData).size()) {
+            if (m_sizeBatch > std::get<0>(audioData).size()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 continue;
             }
-            //if (nSampleSize > getAudioDataSize()) continue;
 
             err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
 
             err = oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for B.");
-
-            //std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
             // Move the cursor to the beginning of the console
             printf("\033[0;0H");
@@ -83,16 +79,13 @@ public:
             printf("----------------------------------------------\n");
 
             for (int i = m_nIndexMinF; i <= m_nIndexMaxF; ++i) {
-                float freq = i * static_cast<float>(m_dwSamplesPerSec) / nSampleSize;
+                float freq = i * static_cast<float>(m_dwSamplesPerSec) / m_sizeBatch;
                 printf("%10.2f | %6d | %10.6f | %10.6f\n", freq, i, onesidePowerA.data()[i], onesidePowerB.data()[i]);
             }
 
             ++i;
 
-        //} while (m_nMessageID == AM_DATASTART || nSampleSize >= getAudioDataSize());
         } while (m_nMessageID == AM_DATASTART);
-        //} while (nSampleSize >= getAudioDataSize());
-
 
         oDft.releaseOpenCLResources();
     }
@@ -123,11 +116,10 @@ int main() {
         std::cout << "\033c";
 
         // Read audio data in a new thread
-        std::thread t1(&CiAudioDft::readAudioData, &audio, 10.0f);
-        //std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::thread t1(&CiAudioDft::readAudioData, &audio, 50.0f);
 
         // Process the audio data in a new thread
-        std::thread t2(&CiAudioDft::processAudioData, &audio, nSampleSize);
+        std::thread t2(&CiAudioDft::processAudioData, &audio);
 
         // Wait for both threads to finish
         t1.join();
