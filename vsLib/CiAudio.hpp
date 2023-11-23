@@ -171,8 +171,10 @@ public:
 
         {
             // Lock the mutex while modifying the queue
-            std::unique_lock<std::mutex> lock(m_mtx);
-            if (N > m_audioData.size()) m_cv.wait(lock);
+            std::lock_guard<std::mutex> lock(m_mtx);
+
+            //std::unique_lock<std::mutex> lock(m_mtx);
+            //if (N > m_audioData.size()) m_cv.wait(lock);
 
             if (N > m_audioData.size()) return { chAData, chBData };
 
@@ -355,7 +357,7 @@ public:
                         m_audioData.push_back(pAudioData[i]);
                     }
 
-                    if (m_audioData.size() >= 2*2048) m_cv.notify_one();
+                    if (m_audioData.size() >= 2048) m_cv.notify_one();
                 }
 
                 hr = m_pCaptureClient->ReleaseBuffer(numFramesAvailable);
@@ -370,8 +372,6 @@ public:
         m_nMessageID = AM_DATAEND;
         m_cv.notify_one();
 
-        // Wait for the remaining audio data to be processed
-        //std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
 };

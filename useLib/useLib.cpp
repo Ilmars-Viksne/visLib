@@ -51,8 +51,7 @@ public:
 
         size_t i = 1;
 
-        float fpDt = nSampleSize / static_cast<float>(m_dwSamplesPerSec);
-        //float fpTime = 0.0f;
+        double dbDt = nSampleSize / static_cast<double>(m_dwSamplesPerSec);
 
         do
         {
@@ -60,7 +59,12 @@ public:
             std::tuple<std::vector<float>, std::vector<float>>
                 audioData = moveFirstSample();
 
-            if (nSampleSize > getAudioDataSize()) continue;
+
+            if (nSampleSize > std::get<0>(audioData).size()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+            //if (nSampleSize > getAudioDataSize()) continue;
 
             err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
@@ -68,13 +72,12 @@ public:
             err = oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for B.");
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            //std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
             // Move the cursor to the beginning of the console
-            //fpTime = i * fpDt;
             printf("\033[0;0H");
             printf("\n  Normalized One-Sided Power Spectrum after ");
-            printf(" %10.6f seconds:\n", i * fpDt);
+            printf(" %10.6f seconds:\n", i * dbDt);
             printf("----------------------------------------------\n");
             printf(" Frequency | Index  |   Power A  |   Power B\n");
             printf("----------------------------------------------\n");
@@ -86,7 +89,10 @@ public:
 
             ++i;
 
-        } while (m_nMessageID == AM_DATASTART || nSampleSize >= getAudioDataSize());
+        //} while (m_nMessageID == AM_DATASTART || nSampleSize >= getAudioDataSize());
+        } while (m_nMessageID == AM_DATASTART);
+        //} while (nSampleSize >= getAudioDataSize());
+
 
         oDft.releaseOpenCLResources();
     }
@@ -116,7 +122,7 @@ int main() {
         std::cout << "\033c";
 
         // Read audio data in a new thread
-        std::thread t1(&CiAudioDft::readAudioData, &audio, 10.0f);
+        std::thread t1(&CiAudioDft::readAudioData, &audio, 30.0f);
         //std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Process the audio data in a new thread
