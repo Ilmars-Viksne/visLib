@@ -91,40 +91,81 @@ public:
     }
 };
 
+
+template <typename T>
+T getNumberFromInput(const std::string& prompt, T defaultValue) {
+    T number;
+
+    // Prompt the user for input
+    std::cout << prompt;
+
+    // Try to read the input
+    std::string input;
+    std::getline(std::cin, input);
+
+    // Check if input is empty
+    if (input.empty()) {
+        // If input is empty, assign a default value
+        number = defaultValue;
+    }
+    else {
+        // Try to convert the input to the specified type
+        try {
+            size_t pos;
+            number = static_cast<T> (std::stod(input, &pos));
+
+            // Check if the entire input was used in the conversion
+            if (pos != input.size()) {
+                throw std::invalid_argument("");
+            }
+        }
+        catch (std::invalid_argument&) {
+            // If conversion fails, assign a default value
+            number = defaultValue;
+        }
+    }
+
+    return number;
+}
+
+
 int main() {
 
 
     try {
         // Create an instance of CiAudioDft
         CiAudioDft audio;
+        std::cout << "\n\tAvailable audio endpoints:\n\n";
         std::wcout << audio.getAudioEndpointsInfo();
+        std::cout << "\t---------------------\n\n";
 
         // Get endpoint number from user
         int endpointNumber;
-        std::cout << "Please enter the endpoint number: ";
+        std::cout << "Enter the endpoint index number (starting from 0): ";
         std::cin >> endpointNumber;
 
         // Activate the endpoint
         audio.activateEndpointByIndex(endpointNumber);
+        std::cout << '\n';
         std::wcout << audio.getStreamFormatInfo();
+        std::cout << '\n';
 
         // Get sample size from user
-        int nSampleSize;
-        std::cout << "Please enter the sample size (2^n): ";
-        std::cin >> nSampleSize;
+        std::cin.ignore();
+        int nSampleSize = getNumberFromInput<int>("Enter the sample size as a 2^n number (default 2048): ", 2048);
+        std::cout << "Sample size:: " << nSampleSize << "\n\n";
+        audio.setBatchSize(nSampleSize);
 
         // Get time from user
-        float fpTime;
-        std::cout << "Please enter the time: ";
-        std::cin >> fpTime;
+        float fpTime = getNumberFromInput<float>("Enter the duration of the calculation in seconds (default 10): ", 10.f);
+        std::cout << "Calculation duration in seconds: " << fpTime << "\n\n";
 
-        audio.setBatchSize(nSampleSize);
-        audio.setIndexRangeF(0, 40);
+        int nIndexMinF = getNumberFromInput<int>("Index of the lower limit of the displayed frequency range (default 0): ", 0);
+        int nIndexMaxF = getNumberFromInput<int>("Index of the upper limit of the displayed frequency range (default 40): ", 40);
+        std::cout << "Index range of displayed frequencies is from " << nIndexMinF << " to " << nIndexMaxF << "\n\n";
+        audio.setIndexRangeF(nIndexMinF, nIndexMaxF);
 
-        const float samplingFrequency = static_cast<float>(audio.getSamplesPerSec());
-        std::cout << "\nSample Size: " << nSampleSize << "  Sampling Frequency: " << samplingFrequency << "\n";
-
-        std::cout << "\nPress any key to continue, or 'Esc' to exit . . .\n";
+        std::cout << "\n Press any key to start the calculation or 'Esc' to exit . . .\n";
         int nR = _getch();  // Wait for any key press
 
         // Check if the key pressed was 'Esc'
@@ -154,6 +195,9 @@ int main() {
     catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << '\n';
     }
+
+    std::cout << "\n Press any key to end . . .\n";
+    int nR = _getch();  // Wait for any key press
 
     return 0;
 }
