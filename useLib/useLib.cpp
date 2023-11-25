@@ -5,6 +5,94 @@
 #include <conio.h>
 #include <iomanip>
 
+template <typename T>
+T getNumberFromInput(const std::string& prompt, T defaultValue) {
+    T number;
+
+    // Prompt the user for input
+    std::cout << prompt;
+
+    // Try to read the input
+    std::string input;
+    std::getline(std::cin, input);
+
+    // Check if input is empty
+    if (input.empty()) {
+        // If input is empty, assign a default value
+        number = defaultValue;
+    }
+    else {
+        // Try to convert the input to the specified type
+        try {
+            size_t pos;
+            number = static_cast<T> (std::stod(input, &pos));
+
+            // Check if the entire input was used in the conversion
+            if (pos != input.size()) {
+                throw std::invalid_argument("");
+            }
+        }
+        catch (std::invalid_argument&) {
+            // If conversion fails, assign a default value
+            number = defaultValue;
+        }
+    }
+
+    return number;
+}
+
+void clearConsole() {
+    // Get the console handle
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hConsole == INVALID_HANDLE_VALUE) {
+        throw std::runtime_error("Failed to get console handle");
+    }
+
+    // Get the size of the console window
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        throw std::runtime_error("Failed to get console buffer info");
+    }
+    DWORD consoleSize = csbi.dwSize.X * csbi.dwSize.Y;
+
+    // Fill the entire screen with blanks
+    DWORD charsWritten;
+    if (!FillConsoleOutputCharacter(hConsole, (TCHAR)' ', consoleSize, { 0, 0 }, &charsWritten)) {
+        throw std::runtime_error("Failed to fill console output character");
+    }
+
+    // Get the current text attribute
+    if (!GetConsoleScreenBufferInfo(hConsole, &csbi)) {
+        throw std::runtime_error("Failed to get console buffer info");
+    }
+
+    // Set the buffer's attributes accordingly
+    if (!FillConsoleOutputAttribute(hConsole, csbi.wAttributes, consoleSize, { 0, 0 }, &charsWritten)) {
+        throw std::runtime_error("Failed to fill console output attribute");
+    }
+
+    // Put the cursor at (0, 0)
+    if (!SetConsoleCursorPosition(hConsole, { 0, 0 })) {
+        throw std::runtime_error("Failed to set console cursor position");
+    }
+}
+
+void setCursorPosition(int x, int y) {
+    // Get the console handle
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hConsole == INVALID_HANDLE_VALUE) {
+        throw std::runtime_error("Failed to get console handle");
+    }
+
+    // Set the cursor position
+    COORD coord;
+    coord.X = x;
+    coord.Y = y;
+    if (!SetConsoleCursorPosition(hConsole, coord)) {
+        throw std::runtime_error("Failed to set console cursor position");
+    }
+}
+
 class CiAudioDft : public CiAudio {
 
 private:
@@ -71,7 +159,8 @@ public:
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for B.");
 
             // Move the cursor to the beginning of the console
-            printf("\033[0;0H");
+            //printf("\033[0;0H");
+            setCursorPosition(0, 0);
             printf("\n  Normalized One-Sided Power Spectrum after ");
             printf(" %10.6f seconds (frames left: %6d)\n", i * dbDt, static_cast<int>(getAudioDataSize()));
             printf("----------------------------------------------\n");
@@ -91,46 +180,7 @@ public:
     }
 };
 
-
-template <typename T>
-T getNumberFromInput(const std::string& prompt, T defaultValue) {
-    T number;
-
-    // Prompt the user for input
-    std::cout << prompt;
-
-    // Try to read the input
-    std::string input;
-    std::getline(std::cin, input);
-
-    // Check if input is empty
-    if (input.empty()) {
-        // If input is empty, assign a default value
-        number = defaultValue;
-    }
-    else {
-        // Try to convert the input to the specified type
-        try {
-            size_t pos;
-            number = static_cast<T> (std::stod(input, &pos));
-
-            // Check if the entire input was used in the conversion
-            if (pos != input.size()) {
-                throw std::invalid_argument("");
-            }
-        }
-        catch (std::invalid_argument&) {
-            // If conversion fails, assign a default value
-            number = defaultValue;
-        }
-    }
-
-    return number;
-}
-
-
 int main() {
-
 
     try {
         // Create an instance of CiAudioDft
@@ -174,7 +224,8 @@ int main() {
         }
 
         // Clear the console
-        std::cout << "\033c";
+        //std::cout << "\033c";
+        clearConsole();
 
         // Read audio data in a new thread
         std::thread t1(&CiAudioDft::readAudioData, &audio, fpTime);
