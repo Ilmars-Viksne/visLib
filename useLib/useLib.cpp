@@ -99,11 +99,13 @@ private:
 
     int m_nIndexMinF;
     int m_nIndexMaxF;
+    CiCLaDft m_oDft;
+    double m_dbTimeStep;
 
 public:
 
     // Constructor to initialize class variables
-    CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0) {}
+    CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0), m_dbTimeStep(0.0) {}
 
     // Setter for m_nIndexMinF and m_nIndexMaxF
     void setIndexRangeF(const int nIndexMinF, const int nIndexMaxF) {
@@ -117,6 +119,9 @@ public:
     // Getter for m_nIndexMaxF
     int getIndexMaxF() const { return m_nIndexMaxF; }
 
+    // Getter for m_dbTimeStep
+    double getTimeStep() const { return m_dbTimeStep; }
+
     void processAudioData() {
 
         if (m_dwSamplesPerSec < 1) {
@@ -125,26 +130,23 @@ public:
 
         cl_int err{ 0 };
 
-        // Create an instance of CiCLaDft
-        CiCLaDft oDft;
-
-        err = oDft.setOpenCL();
+        err = m_oDft.setOpenCL();
         if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to initialize OpenCL resources.");
 
-        err = oDft.createOpenCLKernel(static_cast<int>(m_sizeBatch), oDft.P1SN);
+        err = m_oDft.createOpenCLKernel(static_cast<int>(m_sizeBatch), m_oDft.P1SN);
         if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to create an OpenCL kernel.");
 
-        std::vector<float> onesidePowerA(oDft.getOnesideSize());
-        std::vector<float> onesidePowerB(oDft.getOnesideSize());
+        std::vector<float> onesidePowerA(m_oDft.getOnesideSize());
+        std::vector<float> onesidePowerB(m_oDft.getOnesideSize());
 
-        double dbDt = m_sizeBatch / static_cast<double>(m_dwSamplesPerSec);
+        m_dbTimeStep = m_sizeBatch / static_cast<double>(m_dwSamplesPerSec);
 
-        showPowerOnConsole(dbDt, onesidePowerA, onesidePowerB, oDft);
+        showPowerOnConsole(onesidePowerA, onesidePowerB);
 
-        oDft.releaseOpenCLResources();
+        m_oDft.releaseOpenCLResources();
     }
 
-    void showPowerOnConsole(double dbDt, std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB, CiCLaDft& oDft) {
+    void showPowerOnConsole(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
         size_t i = 1;
         do
         {
@@ -157,17 +159,17 @@ public:
                 continue;
             }
 
-            cl_int err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
+            cl_int err = m_oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
 
-            err = oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
+            err = m_oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for B.");
 
             // Move the cursor to the beginning of the console
             //printf("\033[0;0H");
             setCursorPosition(0, 0);
             printf("\n  Normalized One-Sided Power Spectrum after ");
-            printf(" %10.6f seconds (frames left: %6d)\n", i * dbDt, static_cast<int>(getAudioDataSize()));
+            printf(" %10.6f seconds (frames left: %6d)\n", i * m_dbTimeStep, static_cast<int>(getAudioDataSize()));
             printf("----------------------------------------------\n");
             printf(" Frequency | Index  |   Power A  |   Power B\n");
             printf("----------------------------------------------\n");
@@ -182,6 +184,8 @@ public:
         } while (m_nMessageID == AM_DATASTART);
     }
 };
+
+
 
 int main() {
 
