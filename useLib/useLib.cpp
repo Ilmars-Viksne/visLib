@@ -104,11 +104,14 @@ private:
     CiCLaDft m_oDft;
     double m_dbTimeStep;
     float m_fpFrequencyStep;
+    std::string m_sFolderPath;
+    std::string m_sFolderName;
 
 public:
 
     // Constructor to initialize class variables
-    CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0), m_dbTimeStep(0.0), m_fpFrequencyStep(0.0f) {}
+    CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0), m_dbTimeStep(0.0), m_fpFrequencyStep(0.0f), 
+        m_sFolderPath(""), m_sFolderName("") {}
 
     // Setter for m_nIndexMinF and m_nIndexMaxF
     void setIndexRangeF(const int nIndexMinF, const int nIndexMaxF) {
@@ -127,6 +130,15 @@ public:
 
     // Getter for m_fpFrequencyStep
     float getFrequencyStep() const { return m_fpFrequencyStep; }
+
+    // Setter for m_sFolderPath
+    void setFolderPath(const std::string& sFolderPath) { m_sFolderPath = sFolderPath; }
+
+    // Getter for m_sFolderPath
+    std::string getFolderPath() const { return m_sFolderPath; }
+
+    // Getter for m_sFolderName
+    std::string getFolderName() const { return m_sFolderName; }
 
     void processAudioData() {
 
@@ -154,8 +166,8 @@ public:
         if (m_nIndexMaxF > nOnesideSize) m_nIndexMaxF = nOnesideSize;
         if (m_nIndexMinF > m_nIndexMaxF) m_nIndexMinF = m_nIndexMaxF;
 
-        showPowerOnConsole(onesidePowerA, onesidePowerB);
-        //savePowerAsCSV(onesidePowerA, onesidePowerB);
+        //showPowerOnConsole(onesidePowerA, onesidePowerB);
+        savePowerAsCSV(onesidePowerA, onesidePowerB);
 
         m_oDft.releaseOpenCLResources();
     }
@@ -199,6 +211,7 @@ public:
     }
 
     void savePowerAsCSV(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
+
         size_t i = 1;
 
         // Get current time
@@ -209,11 +222,13 @@ public:
         // Create a folder named with the creation date and time YYMMDD_HHMMSS
         std::ostringstream oss;
         oss << std::put_time(&now, "%y%m%d_%H%M%S");
-        std::string folderName = oss.str();
-        int err = _mkdir(folderName.c_str());
+        m_sFolderName = oss.str();  // Update m_sFolderName
+        m_sFolderPath = m_sFolderPath + "/" + m_sFolderName;  // Update m_sFolderPath
+        int err = _mkdir(m_sFolderPath.c_str());
         if (err != 0) {
-            throw std::runtime_error("Problem creating directory " + folderName);
+            throw std::runtime_error("Problem creating directory " + m_sFolderPath);
         }
+
 
         do
         {
@@ -236,7 +251,7 @@ public:
             double dbTime = i * m_dbTimeStep;
             std::ostringstream oss;
             oss << std::setw(10) << std::setfill('0') << static_cast<int>(dbTime * 1e6);
-            std::string fileName = folderName + "/" + oss.str() + ".csv";
+            std::string fileName = m_sFolderPath + "/" + oss.str() + ".csv";
 
             // Write to the CSV file
             std::ofstream file(fileName);
@@ -274,11 +289,11 @@ int main() {
         audio.setBatchSize(nSampleSize);
 
         // Set audio recording time
-        float fpTime = 10.f;
+        float fpTime = 1.f;
 
         // Frequency range of interest
-        float fpMinF = 10.f;
-        float fpMaxF = 1100.f;
+        float fpMinF = 0.f;
+        float fpMaxF = 44400.f;
 
         float fpFrequencyStep = static_cast<float>(audio.getSamplesPerSec()) / nSampleSize;
 
@@ -297,6 +312,8 @@ int main() {
         // Wait for both threads to finish
         t1.join();
         t2.join();
+
+        printf(" Frames left: %6d)\n", static_cast<int>(audio.getAudioDataSize()));
     }
 
     catch (const OpenCLException& e) {
