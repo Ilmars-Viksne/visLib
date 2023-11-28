@@ -5,6 +5,9 @@
 #include <conio.h>
 #include <iomanip>
 
+#include <ctime>
+#include <direct.h>
+
 template <typename T>
 T getNumberFromInput(const std::string& prompt, T defaultValue) {
     T number;
@@ -142,6 +145,7 @@ public:
         m_dbTimeStep = m_sizeBatch / static_cast<double>(m_dwSamplesPerSec);
 
         showPowerOnConsole(onesidePowerA, onesidePowerB);
+        //savePowerAsCSV(onesidePowerA, onesidePowerB);
 
         m_oDft.releaseOpenCLResources();
     }
@@ -183,8 +187,62 @@ public:
 
         } while (m_nMessageID == AM_DATASTART);
     }
-};
 
+    void savePowerAsCSV(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
+        size_t i = 1;
+
+        // Get current time
+        std::time_t t = std::time(nullptr);
+        std::tm now;
+        localtime_s(&now, &t);
+
+        // Create a folder named with the creation date and time YYMMDD_HHMMSS
+        std::ostringstream oss;
+        oss << std::put_time(&now, "%y%m%d_%H%M%S");
+        std::string folderName = oss.str();
+        int err = _mkdir(folderName.c_str());
+        if (err != 0) {
+            throw std::runtime_error("Problem creating directory " + folderName);
+        }
+
+        do
+        {
+            // Get the read audio data
+            std::tuple<std::vector<float>, std::vector<float>>
+                audioData = moveFirstSample();
+
+            if (m_sizeBatch > std::get<0>(audioData).size()) {
+                //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+
+            cl_int err = m_oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
+            if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
+
+            err = m_oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
+            if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for B.");
+
+            // Create a file with a name that always consists of 10 symbols consisting of "dbTime = i * m_dbTimeStep" expressed in whole microseconds
+            double dbTime = i * m_dbTimeStep;
+            std::ostringstream oss;
+            oss << std::setw(10) << std::setfill('0') << static_cast<int>(dbTime * 1e6);
+            std::string fileName = folderName + "/" + oss.str() + ".csv";
+
+            // Write to the CSV file
+            std::ofstream file(fileName);
+            file << "Index,Frequency,Power A,Power B\n";
+            for (int j = m_nIndexMinF; j <= m_nIndexMaxF; ++j) {
+                float freq = j * static_cast<float>(m_dwSamplesPerSec) / m_sizeBatch;
+                file << j << "," << freq << "," << onesidePowerA.data()[j] << "," << onesidePowerB.data()[j] << "\n";
+            }
+            file.close();
+
+            ++i;
+
+        } while (m_nMessageID == AM_DATASTART);
+    }
+
+};
 
 
 int main() {
