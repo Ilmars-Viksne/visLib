@@ -104,11 +104,12 @@ private:
     int m_nIndexMaxF;
     CiCLaDft m_oDft;
     double m_dbTimeStep;
+    float m_fpFrequencyStep;
 
 public:
 
     // Constructor to initialize class variables
-    CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0), m_dbTimeStep(0.0) {}
+    CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0), m_dbTimeStep(0.0), m_fpFrequencyStep(0.0f) {}
 
     // Setter for m_nIndexMinF and m_nIndexMaxF
     void setIndexRangeF(const int nIndexMinF, const int nIndexMaxF) {
@@ -124,6 +125,9 @@ public:
 
     // Getter for m_dbTimeStep
     double getTimeStep() const { return m_dbTimeStep; }
+
+    // Getter for m_fpFrequencyStep
+    float getFrequencyStep() const { return m_fpFrequencyStep; }
 
     void processAudioData() {
 
@@ -143,6 +147,7 @@ public:
         std::vector<float> onesidePowerB(m_oDft.getOnesideSize());
 
         m_dbTimeStep = m_sizeBatch / static_cast<double>(m_dwSamplesPerSec);
+        m_fpFrequencyStep = static_cast<float>(m_dwSamplesPerSec) / m_sizeBatch;
 
         showPowerOnConsole(onesidePowerA, onesidePowerB);
         //savePowerAsCSV(onesidePowerA, onesidePowerB);
@@ -179,7 +184,7 @@ public:
             printf("----------------------------------------------\n");
 
             for (int j = m_nIndexMinF; j <= m_nIndexMaxF; ++j) {
-                float freq = j * static_cast<float>(m_dwSamplesPerSec) / m_sizeBatch;
+                float freq = j * m_fpFrequencyStep;
                 printf("%10.2f | %6d | %10.6f | %10.6f\n", freq, j, onesidePowerA.data()[j], onesidePowerB.data()[j]);
             }
 
@@ -232,7 +237,7 @@ public:
             std::ofstream file(fileName);
             file << "Index,Frequency,Power A,Power B\n";
             for (int j = m_nIndexMinF; j <= m_nIndexMaxF; ++j) {
-                float freq = j * static_cast<float>(m_dwSamplesPerSec) / m_sizeBatch;
+                float freq = j * m_fpFrequencyStep;
                 file << j << "," << freq << "," << onesidePowerA.data()[j] << "," << onesidePowerB.data()[j] << "\n";
             }
             file.close();
@@ -317,3 +322,78 @@ int main() {
 
     return 0;
 }
+
+
+int goCiAudioConsole() {
+
+    try {
+        // Create an instance of CiAudioDft
+        CiAudioDft audio;
+        std::cout << "\n\tAvailable audio endpoints:\n\n";
+        std::wcout << audio.getAudioEndpointsInfo();
+        std::cout << "\t---------------------\n\n";
+
+        // Get endpoint number from user
+        int endpointNumber;
+        std::cout << "Enter the endpoint index number (starting from 0): ";
+        std::cin >> endpointNumber;
+
+        // Activate the endpoint
+        audio.activateEndpointByIndex(endpointNumber);
+        std::cout << '\n';
+        std::wcout << audio.getStreamFormatInfo();
+        std::cout << '\n';
+
+        // Get sample size from user
+        std::cin.ignore();
+        int nSampleSize = getNumberFromInput<int>("Enter the sample size as a 2^n number (default 2048): ", 2048);
+        std::cout << "Sample size:: " << nSampleSize << "\n\n";
+        audio.setBatchSize(nSampleSize);
+
+        // Get time from user
+        float fpTime = getNumberFromInput<float>("Enter the duration of the calculation in seconds (default 10): ", 10.f);
+        std::cout << "Calculation duration in seconds: " << fpTime << "\n\n";
+
+        int nIndexMinF = getNumberFromInput<int>("Index of the lower limit of the displayed frequency range (default 0): ", 0);
+        int nIndexMaxF = getNumberFromInput<int>("Index of the upper limit of the displayed frequency range (default 40): ", 40);
+        std::cout << "Index range of displayed frequencies is from " << nIndexMinF << " to " << nIndexMaxF << "\n\n";
+        audio.setIndexRangeF(nIndexMinF, nIndexMaxF);
+
+        std::cout << "\n Press any key to start the calculation or 'Esc' to exit . . .\n";
+        int nR = _getch();  // Wait for any key press
+
+        // Check if the key pressed was 'Esc'
+        if (nR == 27) {
+            return 0;  // Exit the program
+        }
+
+        // Clear the console
+        //std::cout << "\033c";
+        clearConsole();
+
+        // Read audio data in a new thread
+        std::thread t1(&CiAudioDft::readAudioData, &audio, fpTime);
+
+        // Process the audio data in a new thread
+        std::thread t2(&CiAudioDft::processAudioData, &audio);
+
+        // Wait for both threads to finish
+        t1.join();
+        t2.join();
+    }
+
+    catch (const OpenCLException& e) {
+        std::cerr << "OpenCL Error: " << e.what() << " (Error Code: " << e.getErrorCode() << ")" << std::endl;
+        return 1;
+    }
+
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << '\n';
+    }
+
+    std::cout << "\n Press any key to end . . .\n";
+    int nR = _getch();  // Wait for any key press
+
+    return 0;
+}
+
