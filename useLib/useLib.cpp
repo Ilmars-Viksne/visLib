@@ -6,6 +6,8 @@
 #include <iomanip>
 #include <ctime>
 #include <direct.h>
+#include <io.h>
+#include <vector>
 
 template <typename T>
 T getNumberFromInput(const std::string& prompt, T defaultValue) {
@@ -229,7 +231,6 @@ public:
             throw std::runtime_error("Problem creating directory " + m_sFolderPath);
         }
 
-
         do
         {
             // Get the read audio data
@@ -267,6 +268,46 @@ public:
         } while (m_nMessageID == AM_DATASTART);
     }
 
+    // Method to delete a file in the created folder
+    void deleteFile(const std::string& fileName) {
+        std::string filePath = m_sFolderPath + "/" + fileName;
+        if (_access(filePath.c_str(), 0) != -1) {
+            remove(filePath.c_str());
+        }
+        else {
+            throw std::runtime_error("File " + fileName + " does not exist in the directory " + m_sFolderPath);
+        }
+    }
+
+    // Method to return a list of all files in the created folder
+    std::vector<std::string> listFiles() {
+        std::vector<std::string> files;
+        struct _finddata_t fileinfo;
+        intptr_t handle;
+
+        std::string folderSearch = m_sFolderPath + "/*.*";
+        if ((handle = _findfirst(folderSearch.c_str(), &fileinfo)) != -1) {
+            do {
+                files.push_back(fileinfo.name);
+            } while (_findnext(handle, &fileinfo) == 0);
+            _findclose(handle);
+        }
+
+        return files;
+    }
+
+    // Method to delete the created folder if the folder is empty
+    void deleteFolderIfEmpty() {
+        std::vector<std::string> files = listFiles();
+        if (files.size() <= 2) {  // '.' and '..' are always present
+            int err = _rmdir(m_sFolderPath.c_str());
+        }
+        else {
+            throw std::runtime_error("Directory " + m_sFolderPath + " is not empty.");
+        }
+    }
+
+
 };
 
 
@@ -293,7 +334,7 @@ int main() {
 
         // Frequency range of interest
         float fpMinF = 0.f;
-        float fpMaxF = 44400.f;
+        float fpMaxF = 24000.f;
 
         float fpFrequencyStep = static_cast<float>(audio.getSamplesPerSec()) / nSampleSize;
 
