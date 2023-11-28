@@ -107,7 +107,7 @@ public:
 
     // Setter for m_nIndexMinF and m_nIndexMaxF
     void setIndexRangeF(const int nIndexMinF, const int nIndexMaxF) {
-        m_nIndexMinF = nIndexMinF; 
+        m_nIndexMinF = nIndexMinF;
         m_nIndexMaxF = nIndexMaxF;
     }
 
@@ -137,10 +137,15 @@ public:
         std::vector<float> onesidePowerA(oDft.getOnesideSize());
         std::vector<float> onesidePowerB(oDft.getOnesideSize());
 
-        size_t i = 1;
-
         double dbDt = m_sizeBatch / static_cast<double>(m_dwSamplesPerSec);
 
+        showPowerOnConsole(dbDt, onesidePowerA, onesidePowerB, oDft);
+
+        oDft.releaseOpenCLResources();
+    }
+
+    void showPowerOnConsole(double dbDt, std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB, CiCLaDft& oDft) {
+        size_t i = 1;
         do
         {
             // Get the read audio data
@@ -152,7 +157,7 @@ public:
                 continue;
             }
 
-            err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
+            cl_int err = oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
 
             err = oDft.executeOpenCLKernel(std::get<1>(audioData).data(), onesidePowerB.data());
@@ -175,8 +180,6 @@ public:
             ++i;
 
         } while (m_nMessageID == AM_DATASTART);
-
-        oDft.releaseOpenCLResources();
     }
 };
 
