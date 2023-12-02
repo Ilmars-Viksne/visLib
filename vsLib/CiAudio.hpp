@@ -22,8 +22,8 @@ private:
     // Smart pointer for the COM multimedia device enumerator.
     std::shared_ptr<IMMDeviceEnumerator> m_pEnumerator;
 
-    // Vector of smart pointers to manage COM endpoint objects.
-    std::vector<std::unique_ptr<IMMDevice>> m_pEndpoints;
+    // A collection of multimedia device resources.
+    IMMDeviceCollection* m_pCollection = nullptr;
 
     // Pointer to the WAVEFORMATEX structure that specifies the stream format.
     WAVEFORMATEX* m_pFormat;
@@ -65,7 +65,7 @@ public:
     const int AM_DATASTART = 11;
     const int AM_DATAEND = 12;
 
-    CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), 
+    CiAudio(): m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), m_pCollection(nullptr), m_pDevice(nullptr),
         m_sizeAudioClientNo(-1), m_dwSamplesPerSec(0), m_nMessageID(1), m_sizeBatch(0) {
         // Initialize COM library using RAII.
         HRESULT hr = CoInitialize(nullptr);
@@ -80,41 +80,12 @@ public:
         }
 
         // Enumerate the audio endpoints and store them in smart pointers.
-        IMMDeviceCollection* pCollection = nullptr;
-        hr = m_pEnumerator->EnumAudioEndpoints(eAll, DEVICE_STATE_ACTIVE, &pCollection);
+        //IMMDeviceCollection* pCollection = nullptr;
+        hr = m_pEnumerator->EnumAudioEndpoints(eAll, DEVICE_STATE_ACTIVE, &m_pCollection);
         if (FAILED(hr)) {
             throw std::runtime_error("Failed to enumerate audio endpoints");
         }
 
-        UINT count;
-        hr = pCollection->GetCount(&count);
-        m_pEndpoints.reserve(count);
-
-        for (UINT i = 0; i < count; i++) {
-            hr = pCollection->Item(i, &m_pDevice);
-            if (SUCCEEDED(hr)) {
-                m_pEndpoints.emplace_back(m_pDevice);
-            }
-        }
-
-        // Release the endpoint collection.
-        CoTaskMemFree(pCollection);
-    }
-
-    // Getter for the vector of endpoints with exception handling.
-    const std::vector<std::unique_ptr<IMMDevice>>& getEndpoints() const {
-        if (m_pEndpoints.empty()) {
-            throw std::runtime_error("No audio endpoints available.");
-        }
-        return m_pEndpoints;
-    }
-
-    // Getter for an endpoint by index with exception handling.
-    IMMDevice* getEndpointByIndex(size_t index) const {
-        if (index < m_pEndpoints.size()) {
-            return m_pEndpoints[index].get();
-        }
-        throw std::out_of_range("Invalid endpoint index.");
     }
 
     // Getter for the audio data
@@ -197,15 +168,22 @@ public:
 
     // Activate an endpoint by index.
     void activateEndpointByIndex(size_t index) {
-        if (index >= m_pEndpoints.size())
+
+        HRESULT hr;
+
+        UINT count;
+        hr = m_pCollection->GetCount(&count);
+        if (FAILED(hr))
+            throw std::runtime_error("Failed to get a count of the devices in the device collection.");
+        if (index >= count)
             throw std::out_of_range("Invalid endpoint index.");
 
         m_sizeAudioClientNo = index;
 
-        m_pDevice = m_pEndpoints[m_sizeAudioClientNo].get();
+        hr = m_pCollection->Item(static_cast<unsigned int>(m_sizeAudioClientNo), &m_pDevice);
 
         // Get the stream format.
-        HRESULT hr = m_pDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, NULL, (void**)&m_pAudioClient);
+       hr = m_pDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, NULL, (void**)&m_pAudioClient);
         if (SUCCEEDED(hr)) {
             hr = m_pAudioClient->GetMixFormat(&m_pFormat);
             if (FAILED(hr)) {
@@ -233,46 +211,64 @@ public:
     }
 
     ~CiAudio() {
+
+        if (m_pCollection != nullptr) m_pCollection->Release();
         // Uninitialize COM library using RAII.
         CoUninitialize();
     }
 
     std::wstring getAudioEndpointsInfo() {
         std::wstringstream info;
+        UINT count;
 
-        for (const auto& pEndpoint : m_pEndpoints) {
-            // Get the endpoint ID.
-            LPWSTR pwszID = nullptr;
-            HRESULT hr = pEndpoint->GetId(&pwszID);
-            if (SUCCEEDED(hr)) {
-                info << L"Endpoint ID: " << pwszID << L"\n";
-                CoTaskMemFree(pwszID);
-            }
+        // Get the number of endpoints in the collection.
+        HRESULT hr = m_pCollection->GetCount(&count);
+        if (FAILED(hr)) {
+            // Handle error.
+        }
 
-            // Get the endpoint name.
-            IPropertyStore* pProps = nullptr;
-            hr = pEndpoint->OpenPropertyStore(STGM_READ, &pProps);
+        for (UINT i = 0; i < count; ++i) {
+            // Get the endpoint at the current index.
+            IMMDevice* pEndpoint = nullptr;
+            hr = m_pCollection->Item(i, &pEndpoint);
             if (SUCCEEDED(hr)) {
-                PROPVARIANT varName;
-                PropVariantInit(&varName);
-                hr = pProps->GetValue(PKEY_Device_FriendlyName, &varName);
+                // Get the endpoint ID.
+                LPWSTR pwszID = nullptr;
+                hr = pEndpoint->GetId(&pwszID);
                 if (SUCCEEDED(hr)) {
-                    info << L"Endpoint Name: " << varName.pwszVal << L"\n";
-                    PropVariantClear(&varName);
+                    info << L"Endpoint ID: " << pwszID << L"\n";
+                    CoTaskMemFree(pwszID);
                 }
-                pProps->Release();
-            }
 
-            // Get the endpoint state.
-            DWORD dwState;
-            hr = pEndpoint->GetState(&dwState);
-            if (SUCCEEDED(hr)) {
-                info << L"Endpoint State: " << dwState << L"\n\n";
+                // Get the endpoint name.
+                IPropertyStore* pProps = nullptr;
+                hr = pEndpoint->OpenPropertyStore(STGM_READ, &pProps);
+                if (SUCCEEDED(hr)) {
+                    PROPVARIANT varName;
+                    PropVariantInit(&varName);
+                    hr = pProps->GetValue(PKEY_Device_FriendlyName, &varName);
+                    if (SUCCEEDED(hr)) {
+                        info << L"Endpoint Name: " << varName.pwszVal << L"\n";
+                        PropVariantClear(&varName);
+                    }
+                    pProps->Release();
+                }
+
+                // Get the endpoint state.
+                DWORD dwState;
+                hr = pEndpoint->GetState(&dwState);
+                if (SUCCEEDED(hr)) {
+                    info << L"Endpoint State: " << dwState << L"\n\n";
+                }
+
+                // Release the endpoint.
+                pEndpoint->Release();
             }
         }
 
         return info.str();
     }
+
 
     std::wstring getStreamFormatInfo() {
         if (m_pFormat == nullptr) {
