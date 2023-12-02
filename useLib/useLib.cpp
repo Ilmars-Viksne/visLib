@@ -108,12 +108,13 @@ private:
     float m_fpFrequencyStep;
     std::string m_sFolderPath;
     std::string m_sFolderName;
+    float m_fpRecordThreshold;
 
 public:
 
     // Constructor to initialize class variables
     CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0), m_dbTimeStep(0.0), m_fpFrequencyStep(0.0f), 
-        m_sFolderPath(""), m_sFolderName("") {}
+        m_sFolderPath(""), m_sFolderName(""), m_fpRecordThreshold(0.0000005f) {}
 
     // Setter for m_nIndexMinF and m_nIndexMaxF
     void setIndexRangeF(const int nIndexMinF, const int nIndexMaxF) {
@@ -231,6 +232,8 @@ public:
             throw std::runtime_error("Problem creating directory " + m_sFolderPath);
         }
 
+        double dbFrequencyStep = static_cast<double>(m_fpFrequencyStep);
+
         do
         {
             // Get the read audio data
@@ -254,14 +257,22 @@ public:
             oss << std::setw(10) << std::setfill('0') << static_cast<int>(dbTime * 1e6);
             std::string fileName = m_sFolderPath + "/" + oss.str() + ".csv";
 
+
             // Write to the CSV file
-            std::ofstream file(fileName);
-            file << "Index,Frequency,Power A,Power B\n";
-            for (int j = m_nIndexMinF; j <= m_nIndexMaxF; ++j) {
-                float freq = j * m_fpFrequencyStep;
-                file << j << "," << freq << "," << onesidePowerA.data()[j] << "," << onesidePowerB.data()[j] << "\n";
+            FILE* file;
+            err = fopen_s(&file, fileName.c_str(), "w");
+            if (err == 0) {
+                fprintf(file, "Frequency,Power A,Power B\n");
+                for (int j = m_nIndexMinF; j <= m_nIndexMaxF; ++j) {
+                    // Skip the record if the power of both channels is less than the threshold value.
+                    if (onesidePowerA.data()[j] < m_fpRecordThreshold && onesidePowerB.data()[j] < m_fpRecordThreshold) continue;
+                    fprintf(file, "%.2f,%f,%f\n", j * dbFrequencyStep, onesidePowerA.data()[j], onesidePowerB.data()[j]);
+                }
+                fclose(file);
             }
-            file.close();
+            else {
+                throw std::runtime_error("Can't open a file " + fileName + ".");
+            }
 
             ++i;
 
@@ -307,7 +318,6 @@ public:
         }
     }
 
-
 };
 
 
@@ -330,7 +340,7 @@ int main() {
         audio.setBatchSize(nSampleSize);
 
         // Set audio recording time
-        float fpTime = 1.f;
+        float fpTime = 5.f;
 
         // Frequency range of interest
         float fpMinF = 0.f;
@@ -341,8 +351,12 @@ int main() {
         audio.setIndexRangeF(static_cast<int>(std::floor(fpMinF/ fpFrequencyStep)), 
             static_cast<int>(std::ceil(fpMaxF / fpFrequencyStep)));
 
-        // Clear the console
-        clearConsole();
+        std::cout << "\n Press any key to start the calculation or 'Esc' to exit . . .\n";
+        int nR = _getch();  // Wait for any key press
+        // Check if the key pressed was 'Esc'
+        if (nR == 27) {
+            return 0;  // Exit the program
+        }
 
         // Read audio data in a new thread
         std::thread t1(&CiAudioDft::readAudioData, &audio, fpTime);
@@ -416,7 +430,6 @@ int goCiAudioConsole() {
         }
 
         // Clear the console
-        //std::cout << "\033c";
         clearConsole();
 
         // Read audio data in a new thread
