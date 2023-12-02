@@ -170,6 +170,7 @@ public:
         if (m_nIndexMinF > m_nIndexMaxF) m_nIndexMinF = m_nIndexMaxF;
 
         //showPowerOnConsole(onesidePowerA, onesidePowerB);
+        createDataFolder();
         savePowerAsCSV(onesidePowerA, onesidePowerB);
 
         m_oDft.releaseOpenCLResources();
@@ -216,21 +217,6 @@ public:
     void savePowerAsCSV(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
 
         size_t i = 1;
-
-        // Get current time
-        std::time_t t = std::time(nullptr);
-        std::tm now;
-        localtime_s(&now, &t);
-
-        // Create a folder named with the creation date and time YYMMDD_HHMMSS
-        std::ostringstream oss;
-        oss << std::put_time(&now, "%y%m%d_%H%M%S");
-        m_sFolderName = oss.str();  // Update m_sFolderName
-        m_sFolderPath = m_sFolderPath + "/" + m_sFolderName;  // Update m_sFolderPath
-        int err = _mkdir(m_sFolderPath.c_str());
-        if (err != 0) {
-            throw std::runtime_error("Problem creating directory " + m_sFolderPath);
-        }
 
         double dbFrequencyStep = static_cast<double>(m_fpFrequencyStep);
 
@@ -279,6 +265,24 @@ public:
         } while (m_nMessageID == AM_DATASTART);
     }
 
+    // Method to create a new data folder
+    void createDataFolder() {
+        // Get current time
+        std::time_t t = std::time(nullptr);
+        std::tm now;
+        localtime_s(&now, &t);
+
+        // Create a folder named with the creation date and time YYMMDD_HHMMSS
+        std::ostringstream oss;
+        oss << std::put_time(&now, "%y%m%d_%H%M%S");
+        m_sFolderName = oss.str();  // Update m_sFolderName
+        m_sFolderPath = m_sFolderPath + "/" + m_sFolderName;  // Update m_sFolderPath
+        int err = _mkdir(m_sFolderPath.c_str());
+        if (err != 0) {
+            throw std::runtime_error("Problem creating directory " + m_sFolderPath);
+        }
+    }
+
     // Method to delete a file in the created folder
     void deleteFile(const std::string& fileName) {
         std::string filePath = m_sFolderPath + "/" + fileName;
@@ -320,10 +324,10 @@ public:
 
 };
 
-
 int main() {
 
     try {
+
         // Create an instance of CiAudioDft
         CiAudioDft audio;
 
@@ -385,6 +389,7 @@ int main() {
 
     return 0;
 }
+
 
 int goCiAudioConsole() {
 
@@ -457,4 +462,3 @@ int goCiAudioConsole() {
 
     return 0;
 }
-
