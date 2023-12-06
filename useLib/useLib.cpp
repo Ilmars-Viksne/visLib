@@ -109,11 +109,15 @@ private:
     std::string m_sFolderPath;
     std::string m_sFolderName;
     float m_fpRecordThreshold;
+    int m_nDoFor;
 
 public:
 
+    const int TO_CONSOLE_A = 0;
+    const int TO_CSV_A = 10;
+
     // Constructor to initialize class variables
-    CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0), m_dbTimeStep(0.0), m_fpFrequencyStep(0.0f), 
+    CiAudioDft() : m_nIndexMinF(0), m_nIndexMaxF(0), m_dbTimeStep(0.0), m_fpFrequencyStep(0.0f), m_nDoFor(0),
         m_sFolderPath(""), m_sFolderName(""), m_fpRecordThreshold(0.0000005f) {}
 
     // Setter for m_nIndexMinF and m_nIndexMaxF
@@ -143,7 +147,9 @@ public:
     // Getter for m_sFolderName
     std::string getFolderName() const { return m_sFolderName; }
 
-    void processAudioData() {
+    void getReady(const int nDoFor) {
+
+        m_nDoFor = nDoFor;
 
         if (m_dwSamplesPerSec < 1) {
             throw std::runtime_error("Sample rate of the audio endpoint < 1.");
@@ -157,26 +163,35 @@ public:
         err = m_oDft.createOpenCLKernel(static_cast<int>(m_sizeBatch), m_oDft.P1SN);
         if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to create an OpenCL kernel.");
 
-        int nOnesideSize = m_oDft.getOnesideSize();
-
-        std::vector<float> onesidePowerA(nOnesideSize);
-        std::vector<float> onesidePowerB(nOnesideSize);
-
         m_dbTimeStep = m_sizeBatch / static_cast<double>(m_dwSamplesPerSec);
         m_fpFrequencyStep = static_cast<float>(m_dwSamplesPerSec) / m_sizeBatch;
+
+        if (m_nDoFor == TO_CSV_A)
+        {
+            createDataFolder();
+        }
+
+    
+    }
+
+    void processAudioData() {
+
+        int nOnesideSize = m_oDft.getOnesideSize();
 
         // Output frequency index check
         if (m_nIndexMaxF > nOnesideSize) m_nIndexMaxF = nOnesideSize;
         if (m_nIndexMinF > m_nIndexMaxF) m_nIndexMinF = m_nIndexMaxF;
 
-        //showPowerOnConsole(onesidePowerA, onesidePowerB);
-        createDataFolder();
-        savePowerAsCSV(onesidePowerA, onesidePowerB);
+        std::vector<float> onesidePowerA(nOnesideSize);
+        std::vector<float> onesidePowerB(nOnesideSize);
+
+        if (m_nDoFor == TO_CSV_A) savePowerAsCSV_A(onesidePowerA, onesidePowerB);
+        if (m_nDoFor == TO_CONSOLE_A) showPowerOnConsole_A(onesidePowerA, onesidePowerB);
 
         m_oDft.releaseOpenCLResources();
     }
 
-    void showPowerOnConsole(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
+    void showPowerOnConsole_A(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
         size_t i = 1;
         do
         {
@@ -214,7 +229,7 @@ public:
         } while (m_nMessageID == AM_DATASTART);
     }
 
-    void savePowerAsCSV(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
+    void savePowerAsCSV_A(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
 
         size_t i = 1;
 
@@ -303,7 +318,10 @@ public:
         std::string folderSearch = m_sFolderPath + "/*.*";
         if ((handle = _findfirst(folderSearch.c_str(), &fileinfo)) != -1) {
             do {
-                files.push_back(fileinfo.name);
+                // Check if the item is not a directory
+                if ((fileinfo.attrib & _A_SUBDIR) == 0) {
+                    files.push_back(fileinfo.name);
+                }
             } while (_findnext(handle, &fileinfo) == 0);
             _findclose(handle);
         }
@@ -350,17 +368,28 @@ int main() {
         float fpMinF = 0.f;
         float fpMaxF = 24000.f;
 
+        audio.setFolderPath("E:/Test_Data");
+
         float fpFrequencyStep = static_cast<float>(audio.getSamplesPerSec()) / nSampleSize;
 
         audio.setIndexRangeF(static_cast<int>(std::floor(fpMinF/ fpFrequencyStep)), 
             static_cast<int>(std::ceil(fpMaxF / fpFrequencyStep)));
 
-        std::cout << "\n Press any key to start the calculation or 'Esc' to exit . . .\n";
+        std::cout << "Calculation duration in seconds: " << fpTime << "\n";
+        std::cout << "Sample size:: " << audio.getBatchSize() << "\n";
+        std::cout << "Index range of displayed frequencies is from " 
+            << audio.getIndexMinF() << " to " << audio.getIndexMaxF() << "\n";
+        std::cout << "Data folder location: " << audio.getFolderPath() << "\n";
+
+        audio.getReady(audio.TO_CSV_A);
+
+        std::cout << "\nPress any key to start the calculation or 'Esc' to exit . . .\n";
         int nR = _getch();  // Wait for any key press
         // Check if the key pressed was 'Esc'
         if (nR == 27) {
             return 0;  // Exit the program
         }
+        std::cout << "\n\tCalculation in progress ...\n";
 
         // Read audio data in a new thread
         std::thread t1(&CiAudioDft::readAudioData, &audio, fpTime);
@@ -372,7 +401,29 @@ int main() {
         t1.join();
         t2.join();
 
-        printf(" Frames left: %6d)\n", static_cast<int>(audio.getAudioDataSize()));
+        std::cout << "\n\tThe calculation is complete.\n\n";
+        std::cout << "Number of unprocessed audio frames: " << audio.getAudioDataSize() << "\n";
+
+        // Print the file names
+        std::cout << "\n\tList of saved files in folder " << audio.getFolderPath() << "\n";
+        std::vector<std::string> fileList = audio.listFiles();
+        for (const std::string& file : fileList) {
+            std::cout << file << "\n";
+        }
+
+        std::cout << "\nPress 'Y' to delete files or any other key to continue: ";
+        // Read a character from the console
+        int key = getchar();
+        // Check if the pressed key is 'Y'
+        if (key == 'Y' || key == 'y') {
+            // Delete the filees
+            for (const std::string& file : fileList) {
+                audio.deleteFile(file);
+            }
+            audio.deleteFolderIfEmpty();
+        }
+
+
     }
 
     catch (const OpenCLException& e) {
@@ -384,7 +435,7 @@ int main() {
         std::cerr << "Error: " << e.what() << '\n';
     }
 
-    std::cout << "\n Press any key to end . . .\n";
+    std::cout << "\n\n\tPress any key to end . . .\n";
     int nR = _getch();  // Wait for any key press
 
     return 0;
