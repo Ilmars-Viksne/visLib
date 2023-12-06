@@ -45,6 +45,81 @@ void printPowerRange2Ch(const float* spectrumPowerA, const float* spectrumPowerB
     }
 }
 
+
+int goCiAudioConsole() {
+
+    try {
+        // Create an instance of CiAudioDft
+        vi::CiAudioDft audio;
+        std::cout << "\n\tAvailable audio endpoints:\n\n";
+        std::wcout << audio.getAudioEndpointsInfo();
+        std::cout << "\t---------------------\n\n";
+
+        // Get endpoint number from user
+        int endpointNumber;
+        std::cout << "Enter the endpoint index number (starting from 0): ";
+        std::cin >> endpointNumber;
+
+        // Activate the endpoint
+        audio.activateEndpointByIndex(endpointNumber);
+        std::cout << '\n';
+        std::wcout << audio.getStreamFormatInfo();
+        std::cout << '\n';
+
+        // Get sample size from user
+        std::cin.ignore();
+        int nSampleSize = vi::getNumberFromInput<int>("Enter the sample size as a 2^n number (default 2048): ", 2048);
+        std::cout << "Sample size:: " << nSampleSize << "\n\n";
+        audio.setBatchSize(nSampleSize);
+
+        // Get time from user
+        float fpTime = vi::getNumberFromInput<float>("Enter the duration of the calculation in seconds (default 10): ", 10.f);
+        std::cout << "Calculation duration in seconds: " << fpTime << "\n\n";
+
+        int nIndexMinF = vi::getNumberFromInput<int>("Index of the lower limit of the displayed frequency range (default 0): ", 0);
+        int nIndexMaxF = vi::getNumberFromInput<int>("Index of the upper limit of the displayed frequency range (default 40): ", 40);
+        std::cout << "Index range of displayed frequencies is from " << nIndexMinF << " to " << nIndexMaxF << "\n\n";
+        audio.setIndexRangeF(nIndexMinF, nIndexMaxF);
+
+        audio.getReady(audio.TO_CONSOLE_A);
+
+        std::cout << "\n Press any key to start the calculation or 'Esc' to exit . . .\n";
+        int nR = _getch();  // Wait for any key press
+
+        // Check if the key pressed was 'Esc'
+        if (nR == 27) {
+            return 0;  // Exit the program
+        }
+
+        // Clear the console
+        vi::clearConsole();
+
+        // Read audio data in a new thread
+        std::thread t1(&vi::CiAudioDft::readAudioData, &audio, fpTime);
+
+        // Process the audio data in a new thread
+        std::thread t2(&vi::CiAudioDft::processAudioData, &audio);
+
+        // Wait for both threads to finish
+        t2.join();
+        t1.join();
+    }
+
+    catch (const OpenCLException& e) {
+        std::cerr << "OpenCL Error: " << e.what() << " (Error Code: " << e.getErrorCode() << ")" << std::endl;
+        return 1;
+    }
+
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << '\n';
+    }
+
+    std::cout << "\n Press any key to end . . .\n";
+    int nR = _getch();  // Wait for any key press
+
+    return 0;
+}
+
 int goCiAudioStereo() {
 
     const int nSampleSize = 2048;
