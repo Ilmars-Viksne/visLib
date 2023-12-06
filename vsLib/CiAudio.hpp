@@ -1,3 +1,11 @@
+// This C++ code defines a class for handling audio capture using 
+// the Windows Core Audio API. This class is designed for capturing audio data, 
+// managing endpoints, and providing information about audio devices and 
+// formats. Error handling is included throughout the class to handle 
+// potential failures in the audio capture process.
+// Author: Ilmars Viksne
+// Date: December 06, 2023
+
 #pragma once
 #include <mmdeviceapi.h>
 #include <functiondiscoverykeys_devpkey.h>
@@ -13,12 +21,17 @@
 
 namespace vi {
 
-    // Define a new structure to hold the audio frrame data
+    /// <summary>
+    /// Structure to hold audio frame data with two channels.
+    /// </summary>
     struct AudioCH2F {
         float chA;
         float chB;
     };
 
+    /// <summary>
+    /// Class for handling audio capture using the Windows Core Audio API.
+    /// </summary>
     class CiAudio {
     private:
         // Smart pointer for the COM multimedia device enumerator.
@@ -30,19 +43,19 @@ namespace vi {
         // Pointer to the WAVEFORMATEX structure that specifies the stream format.
         WAVEFORMATEX* m_pFormat;
 
-        // Pointer to the IMMDevice interface.
+        // Pointer to the IMMDevice interface
         IMMDevice* m_pDevice;
 
-        // Pointer to the IAudioClient interface.
+        // Pointer to the IAudioClient interface
         IAudioClient* m_pAudioClient;
 
-        // Index of the audio client.
+        // Index of the audio client
         size_t m_sizeAudioClientNo;
 
-        // Pointer to the IAudioCaptureClient interface.
+        // Pointer to the IAudioCaptureClient interface
         IAudioCaptureClient* m_pCaptureClient;
 
-        // Queue to accumulate the read audio data.
+        // Queue to accumulate the read audio data
         std::vector<AudioCH2F> m_audioData;
 
     protected:
@@ -63,10 +76,25 @@ namespace vi {
 
     public:
 
+        /// <summary>
+        /// Message ID indicating that audio capture has started.
+        /// </summary>
         const int AM_STARTED = 1;
+
+        /// <summary>
+        /// Message ID indicating the start of audio data capture.
+        /// </summary>
         const int AM_DATASTART = 11;
+
+        /// <summary>
+        /// Message ID indicating the end of audio data capture.
+        /// </summary>
         const int AM_DATAEND = 12;
 
+        /// <summary>
+        /// Default constructor for CiAudio class.
+        /// Initializes COM library and creates a multimedia device enumerator.
+        /// </summary>
         CiAudio() : m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), m_pCollection(nullptr), m_pDevice(nullptr),
             m_sizeAudioClientNo(-1), m_dwSamplesPerSec(0), m_nMessageID(1), m_sizeBatch(0) {
             // Initialize COM library using RAII.
@@ -82,7 +110,6 @@ namespace vi {
             }
 
             // Enumerate the audio endpoints and store them in smart pointers.
-            //IMMDeviceCollection* pCollection = nullptr;
             hr = m_pEnumerator->EnumAudioEndpoints(eAll, DEVICE_STATE_ACTIVE, &m_pCollection);
             if (FAILED(hr)) {
                 throw std::runtime_error("Failed to enumerate audio endpoints");
@@ -90,37 +117,69 @@ namespace vi {
 
         }
 
-        // Getter for the audio data
+        /// <summary>
+        /// Destructor for CiAudio class.
+        /// Releases resources, including the device collection, and uninitializes COM.
+        /// </summary>
+        ~CiAudio() {
+            if (m_pCollection != nullptr) m_pCollection->Release();
+            // Uninitialize COM library using RAII.
+            CoUninitialize();
+        }
+
+        /// <summary>
+        /// Gets the captured audio data.
+        /// </summary>
+        /// <returns>A vector containing audio frame data with two channels.</returns>
         std::vector<AudioCH2F> getAudioData() const {
             return m_audioData;
         }
 
-        // Getter for the audio data size
+        /// <summary>
+        /// Gets the size of the captured audio data.
+        /// </summary>
+        /// <returns>The number of audio frames in the captured data.</returns>
         size_t getAudioDataSize() const {
             return m_audioData.size();
         }
 
-        // Getter for sample rate of the audio endpoint
+        /// <summary>
+        /// Gets the sample rate of the audio endpoint.
+        /// </summary>
+        /// <returns>The sample rate in Hertz (Hz).</returns>
         DWORD getSamplesPerSec() const {
             return m_dwSamplesPerSec;
         }
 
-        // Getter for message ID
+        /// <summary>
+        /// Gets the current message ID.
+        /// </summary>
+        /// <returns>The current message ID.</returns>
         int getMessageID() const {
             return m_nMessageID;
         }
 
-        // Getter for audio frame batch size
+        /// <summary>
+        /// Gets the batch size of audio frames for further processing.
+        /// </summary>
+        /// <returns>The batch size of audio frames.</returns>
         size_t getBatchSize() const {
             return m_sizeBatch;
         }
 
-        // Setter for audio frame batch size
+        /// <summary>
+        /// Sets the batch size of audio frames for further processing.
+        /// </summary>
+        /// <param name="sizeBatch">The new batch size.</param>
         void setBatchSize(const size_t sizeBatch) {
             m_sizeBatch = sizeBatch;
         }
 
-        // Method to get and remove the N first frames
+        /// <summary>
+        /// Gets and removes the first N frames of captured audio data.
+        /// </summary>
+        /// <param name="N">The number of frames to retrieve and remove.</param>
+        /// <returns>A tuple containing vectors of audio data for channel A and channel B.</returns>
         std::tuple<std::vector<float>, std::vector<float>> moveFirstFrames(std::size_t N) {
 
             std::vector<float> chAData;
@@ -145,7 +204,10 @@ namespace vi {
             return { chAData, chBData };
         }
 
-        // Method to get and remove the first sample frames
+        /// <summary>
+        /// Gets and removes the first sample frames of captured audio data.
+        /// </summary>
+        /// <returns>A tuple containing vectors of audio data for channel A and channel B.</returns>
         std::tuple<std::vector<float>, std::vector<float>> moveFirstSample() {
 
             std::vector<float> chAData;
@@ -168,7 +230,10 @@ namespace vi {
             return { chAData, chBData };
         }
 
-        // Activate an endpoint by index.
+        /// <summary>
+        /// Activates an audio endpoint by its index.
+        /// </summary>
+        /// <param name="index">The index of the audio endpoint to activate.</param>
         void activateEndpointByIndex(size_t index) {
 
             HRESULT hr;
@@ -184,7 +249,7 @@ namespace vi {
 
             hr = m_pCollection->Item(static_cast<unsigned int>(m_sizeAudioClientNo), &m_pDevice);
 
-            // Get the stream format.
+            // Get the stream format
             hr = m_pDevice->Activate(__uuidof(IAudioClient), CLSCTX_ALL, NULL, (void**)&m_pAudioClient);
             if (SUCCEEDED(hr)) {
                 hr = m_pAudioClient->GetMixFormat(&m_pFormat);
@@ -192,19 +257,19 @@ namespace vi {
                     throw std::runtime_error("Failed to get stream format.");
                 }
 
-                // Initialize the audio client.
+                // Initialize the audio client
                 hr = m_pAudioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, 10000000, 0, m_pFormat, NULL);
                 if (FAILED(hr)) {
                     throw std::runtime_error("Failed to initialize audio client.");
                 }
 
-                // Start the audio client.
+                // Start the audio client
                 hr = m_pAudioClient->Start();
                 if (FAILED(hr)) {
                     throw std::runtime_error("Failed to start audio client.");
                 }
 
-                // Get the capture client.
+                // Get the capture client
                 hr = m_pAudioClient->GetService(__uuidof(IAudioCaptureClient), (void**)&m_pCaptureClient);
                 if (FAILED(hr)) {
                     throw std::runtime_error("Failed to get capture client.");
@@ -212,13 +277,10 @@ namespace vi {
             }
         }
 
-        ~CiAudio() {
-
-            if (m_pCollection != nullptr) m_pCollection->Release();
-            // Uninitialize COM library using RAII.
-            CoUninitialize();
-        }
-
+        /// <summary>
+        /// Gets information about all available audio endpoints.
+        /// </summary>
+        /// <returns>A string containing information about audio endpoints.</returns>
         std::wstring getAudioEndpointsInfo() {
             std::wstringstream info;
             UINT count;
@@ -226,7 +288,7 @@ namespace vi {
             // Get the number of endpoints in the collection.
             HRESULT hr = m_pCollection->GetCount(&count);
             if (FAILED(hr)) {
-                // Handle error.
+                // Handle error
             }
 
             for (UINT i = 0; i < count; ++i) {
@@ -271,7 +333,10 @@ namespace vi {
             return info.str();
         }
 
-
+        /// <summary>
+        /// Gets information about the stream format of the audio endpoint.
+        /// </summary>
+        /// <returns>A string containing information about the audio stream format.</returns>
         std::wstring getStreamFormatInfo() {
             if (m_pFormat == nullptr) {
                 throw std::runtime_error("Stream format is not initialized.");
@@ -315,7 +380,10 @@ namespace vi {
             return info.str();
         }
 
-        // Method to read audio data
+        /// <summary>
+        /// Reads audio data from the capture client for a specified duration.
+        /// </summary>
+        /// <param name="fpTime">The duration (in seconds) for which to read audio data.</param>
         void readAudioData(const float fpTime = 0.1f) {
 
             if (m_pCaptureClient == nullptr) {
