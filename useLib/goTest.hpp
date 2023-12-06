@@ -105,7 +105,7 @@ int goCiAudioConsole() {
         t1.join();
     }
 
-    catch (const OpenCLException& e) {
+    catch (const vi::OpenCLException& e) {
         std::cerr << "OpenCL Error: " << e.what() << " (Error Code: " << e.getErrorCode() << ")" << std::endl;
         return 1;
     }
@@ -124,11 +124,11 @@ int goCiAudioStereo() {
 
     const int nSampleSize = 2048;
     cl_int err{ 0 };
-    CiCLaDft oDft;
+    vi::CiCLaDft oDft;
 
     try {
         // Create an instance of CiAudio
-        CiAudio audio;
+        vi::CiAudio audio;
         std::wcout << audio.getAudioEndpointsInfo();
 
         // Activate the first endpoint 1
@@ -189,7 +189,7 @@ int goCiAudioStereo() {
         oDft.releaseOpenCLResources();
     }
 
-    catch (const OpenCLException& e) {
+    catch (const vi::OpenCLException& e) {
         std::cerr << "OpenCL Error: " << e.what() << " (Error Code: " << e.getErrorCode() << ")" << std::endl;
         oDft.releaseOpenCLResources();
         return 1;
@@ -206,7 +206,7 @@ int goCiAudioV01() {
 
     try {
         // Create an instance of CiAudio
-        CiAudio audio;
+        vi::CiAudio audio;
         std::wcout << audio.getAudioEndpointsInfo();
 
         // Activate the first endpoint 1
@@ -252,7 +252,7 @@ int goCiCLaDft()
 
     cl_int err{ 0 };
 
-    CiCLaDft oDft;
+    vi::CiCLaDft oDft;
 
     try
     {
@@ -274,7 +274,7 @@ int goCiCLaDft()
 
             for (int i = 0; i < sampleSize; i++) {
                 float time = (float)i / samplingFrequency;
-                inputReal[i] = (float)(ampl1 * sinf(PI2 * freq1 * time) + ampl2 * sinf(PI2 * freq2 * time));
+                inputReal[i] = (float)(ampl1 * sinf(vi::PI2 * freq1 * time) + ampl2 * sinf(vi::PI2 * freq2 * time));
             }
 
             err = oDft.executeOpenCLKernel(inputReal.data(), onesidePower.data());
@@ -292,7 +292,7 @@ int goCiCLaDft()
         oDft.releaseOpenCLResources();
 
     }
-    catch (const OpenCLException& e) {
+    catch (const vi::OpenCLException& e) {
         std::cerr << "OpenCL Error: " << e.what() << " (Error Code: " << e.getErrorCode() << ")" << std::endl;
         oDft.releaseOpenCLResources();
         return 1;

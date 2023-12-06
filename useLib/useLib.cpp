@@ -4,7 +4,7 @@
 
 int main() {
 
-    int k = 1;
+    int k = 2;
 
     if(k == 1) return goCiAudioConsole();
 
@@ -89,7 +89,7 @@ int main() {
 
     }
 
-    catch (const OpenCLException& e) {
+    catch (const vi::OpenCLException& e) {
         std::cerr << "OpenCL Error: " << e.what() << " (Error Code: " << e.getErrorCode() << ")" << std::endl;
         return 1;
     }
