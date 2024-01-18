@@ -52,7 +52,7 @@ int goCiAudioCSV() {
     try {
 
         // Create an instance of CiAudioDft
-        vi::CiAudioDft audio;
+        vi::CiAudioDft<vi::AudioCH2F> audio;
 
         // Set endpoint number
         int endpointNumber = 1;
@@ -97,10 +97,10 @@ int goCiAudioCSV() {
         std::cout << "\n\tCalculation in progress ...\n";
 
         // Read audio data in a new thread
-        std::thread t1(&vi::CiAudioDft::readAudioData, &audio, fpTime);
+        std::thread t1(&vi::CiAudioDft<vi::AudioCH2F>::readAudioData, &audio, fpTime);
 
         // Process the audio data in a new thread
-        std::thread t2(&vi::CiAudioDft::processAudioData, &audio);
+        std::thread t2(&vi::CiAudioDft<vi::AudioCH2F>::processAudioData, &audio);
 
         // Wait for both threads to finish
         t2.join();
@@ -152,7 +152,7 @@ int goCiAudioConsole() {
 
     try {
         // Create an instance of CiAudioDft
-        vi::CiAudioDft audio;
+        vi::CiAudioDft<vi::AudioCH2F> audio;
         std::cout << "\n\tAvailable audio endpoints:\n\n";
         std::wcout << audio.getAudioEndpointsInfo();
         std::cout << "\t---------------------\n\n";
@@ -197,10 +197,10 @@ int goCiAudioConsole() {
         vi::clearConsole();
 
         // Read audio data in a new thread
-        std::thread t1(&vi::CiAudioDft::readAudioData, &audio, fpTime);
+        std::thread t1(&vi::CiAudioDft<vi::AudioCH2F>::readAudioData, &audio, fpTime);
 
         // Process the audio data in a new thread
-        std::thread t2(&vi::CiAudioDft::processAudioData, &audio);
+        std::thread t2(&vi::CiAudioDft<vi::AudioCH2F>::processAudioData, &audio);
 
         // Wait for both threads to finish
         t2.join();
@@ -230,7 +230,7 @@ int goCiAudioStereo() {
 
     try {
         // Create an instance of CiAudio
-        vi::CiAudio audio;
+        vi::CiAudioDft<vi::AudioCH2F> audio;
         std::wcout << audio.getAudioEndpointsInfo();
 
         // Activate the first endpoint 1
@@ -308,7 +308,7 @@ int goCiAudioV01() {
 
     try {
         // Create an instance of CiAudio
-        vi::CiAudio audio;
+        vi::CiAudioDft<vi::AudioCH2F> audio;
         std::wcout << audio.getAudioEndpointsInfo();
 
         // Activate the first endpoint 1

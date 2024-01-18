@@ -32,6 +32,7 @@ namespace vi {
     /// <summary>
     /// Class for handling audio capture using the Windows Core Audio API.
     /// </summary>
+    template <typename T>
     class CiAudio {
     private:
         // Smart pointer for the COM multimedia device enumerator.
@@ -56,7 +57,7 @@ namespace vi {
         IAudioCaptureClient* m_pCaptureClient;
 
         // Queue to accumulate the read audio data
-        std::vector<AudioCH2F> m_audioData;
+        std::vector<T> m_audioData;
 
     protected:
         // Sample rate (Hz)
@@ -422,7 +423,7 @@ namespace vi {
                         std::lock_guard<std::mutex> lock(m_mtx);
 
                         // Process audio data here...
-                        AudioCH2F* pAudioData = reinterpret_cast<AudioCH2F*>(pData);
+                        T* pAudioData = reinterpret_cast<T*>(pData);
                         for (UINT32 i = 0; i < numFramesAvailable; ++i) {
                             m_audioData.push_back(pAudioData[i]);
                         }

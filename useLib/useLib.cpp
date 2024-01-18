@@ -4,7 +4,7 @@
 
 int main() {
 
-    int k = 3;
+    int k = 1;
 
     if (k == 1) return goCiAudioConsole();
     if (k == 2) return goCiAudioCSV();

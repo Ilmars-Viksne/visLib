@@ -98,7 +98,8 @@ namespace vi {
         }
     }
 
-    class CiAudioDft : public CiAudio {
+    template <typename T>
+    class CiAudioDft : public CiAudio<T> {
 
     private:
 
@@ -152,7 +153,7 @@ namespace vi {
 
             m_nDoFor = nDoFor;
 
-            if (m_dwSamplesPerSec < 1) {
+            if (this->m_dwSamplesPerSec < 1) {
                 throw std::runtime_error("Sample rate of the audio endpoint < 1.");
             }
 
@@ -161,11 +162,11 @@ namespace vi {
             err = m_oDft.setOpenCL();
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to initialize OpenCL resources.");
 
-            err = m_oDft.createOpenCLKernel(static_cast<int>(m_sizeBatch), m_oDft.P1SN);
+            err = m_oDft.createOpenCLKernel(static_cast<int>(this->m_sizeBatch), m_oDft.P1SN);
             if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to create an OpenCL kernel.");
 
-            m_dbTimeStep = m_sizeBatch / static_cast<double>(m_dwSamplesPerSec);
-            m_fpFrequencyStep = static_cast<float>(m_dwSamplesPerSec) / m_sizeBatch;
+            m_dbTimeStep = this->m_sizeBatch / static_cast<double>(this->m_dwSamplesPerSec);
+            m_fpFrequencyStep = static_cast<float>(this->m_dwSamplesPerSec) / this->m_sizeBatch;
 
             if (m_nDoFor == TO_CSV_A)
             {
@@ -197,9 +198,9 @@ namespace vi {
             {
                 // Get the read audio data
                 std::tuple<std::vector<float>, std::vector<float>>
-                    audioData = moveFirstSample();
+                    audioData = this->moveFirstSample();
 
-                if (m_sizeBatch > std::get<0>(audioData).size()) {
+                if (this->m_sizeBatch > std::get<0>(audioData).size()) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     continue;
                 }
@@ -213,7 +214,7 @@ namespace vi {
                 // Move the cursor to the beginning of the console
                 setCursorPosition(0, 0);
                 printf("\n  Normalized One-Sided Power Spectrum after ");
-                printf(" %10.6f seconds (frames left: %6d)\n", i * m_dbTimeStep, static_cast<int>(getAudioDataSize()));
+                printf(" %10.6f seconds (frames left: %6d)\n", i * m_dbTimeStep, static_cast<int>(this->getAudioDataSize()));
                 printf("----------------------------------------------\n");
                 printf(" Frequency | Index  |   Power A  |   Power B\n");
                 printf("----------------------------------------------\n");
@@ -225,7 +226,7 @@ namespace vi {
 
                 ++i;
 
-            } while (m_nMessageID == AM_DATASTART || getAudioDataSize() >= m_sizeBatch);
+            } while (this->m_nMessageID == this->AM_DATASTART || this->getAudioDataSize() >= this->m_sizeBatch);
         }
 
         void savePowerAsCSV_A(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
@@ -238,9 +239,9 @@ namespace vi {
             {
                 // Get the read audio data
                 std::tuple<std::vector<float>, std::vector<float>>
-                    audioData = moveFirstSample();
+                    audioData = this->moveFirstSample();
 
-                if (m_sizeBatch > std::get<0>(audioData).size()) {
+                if (this->m_sizeBatch > std::get<0>(audioData).size()) {
                     //std::cout << "\nWrong Batch at " << i << ": " << std::get<0>(audioData).size() << "\n";
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     continue;
@@ -277,7 +278,7 @@ namespace vi {
 
                 ++i;
 
-            } while (m_nMessageID == AM_DATASTART || getAudioDataSize() >= m_sizeBatch);
+            } while (this->m_nMessageID == this->AM_DATASTART || this->getAudioDataSize() >= this->m_sizeBatch);
         }
 
         // Method to create a new data folder
