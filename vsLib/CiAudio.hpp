@@ -233,9 +233,9 @@ namespace vi {
         }
 
         /// <summary>
-        /// Gets and removes the first sample frames of captured audio data.
+        /// The function retrieves and removes the first sample frames from the captured audio data of two channels.
         /// </summary>
-        /// <returns>A tuple containing vectors of audio data for channel A and channel B.</returns>
+        /// <returns>A tuple is returned that contains vectors of audio data for both channel A and channel B.</returns>
         std::tuple<std::vector<float>, std::vector<float>> moveFirstSample() {
 
             std::vector<float> chAData;
@@ -257,6 +257,30 @@ namespace vi {
 
             return { chAData, chBData };
         }
+
+        /// <summary>
+        /// The function retrieves and removes the first sample frames from the captured audio data of two channels.
+        /// </summary>
+        /// <returns>A tuple is returned that contains a vector of audio data for a single channel.</returns>
+        std::tuple<std::vector<float>> moveFirstSampleCH1() {
+
+            std::vector<float> chAData;
+            {
+                // Lock the mutex while modifying the queue
+                std::lock_guard<std::mutex> lock(m_mtx);
+
+                if (m_sizeBatch > m_audioData.size()) return { chAData };
+
+                for (std::size_t i = 0; i < m_sizeBatch; ++i) {
+                    chAData.push_back(m_audioData[i].chA);
+                }
+
+                m_audioData.erase(m_audioData.begin(), m_audioData.begin() + m_sizeBatch);  // Remove the N first frames
+            }
+
+            return { chAData };
+        }
+
 
         /// <summary>
         /// Activates an audio endpoint by its index.
@@ -375,6 +399,7 @@ namespace vi {
             if (m_pFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
                 WAVEFORMATEXTENSIBLE* pFormatExt = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(m_pFormat);
                 info << L"Waveform audio format: WAVE_FORMAT_EXTENSIBLE\n";
+                m_nNumberOfChannels = static_cast<int>(pFormatExt->Format.nChannels);
                 info << L"Number of Channels: " << pFormatExt->Format.nChannels << L"\n";
                 m_dwSamplesPerSec = pFormatExt->Format.nSamplesPerSec;
                 info << L"Sample Rate: " << m_dwSamplesPerSec << L" (Hz)\n";
