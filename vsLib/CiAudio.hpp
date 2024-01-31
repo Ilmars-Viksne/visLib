@@ -143,7 +143,7 @@ namespace vi {
         /// Gets the captured audio data.
         /// </summary>
         /// <returns>A vector containing audio frame data with two channels.</returns>
-        std::vector<AudioCH2F> getAudioData() const {
+        std::vector<T> getAudioData() const {
             return m_audioData;
         }
 
@@ -259,7 +259,7 @@ namespace vi {
         }
 
         /// <summary>
-        /// The function retrieves and removes the first sample frames from the captured audio data of two channels.
+        /// The function retrieves and removes the first sample frames from the captured audio data of a single channel.
         /// </summary>
         /// <returns>A tuple is returned that contains a vector of audio data for a single channel.</returns>
         std::tuple<std::vector<float>> moveFirstSampleCH1() {
