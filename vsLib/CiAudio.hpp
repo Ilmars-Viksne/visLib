@@ -30,6 +30,13 @@ namespace vi {
     };
 
     /// <summary>
+    /// Structure to hold audio frame data with one channel.
+    /// </summary>
+    struct AudioCH1F {
+        float chA;
+    };
+
+    /// <summary>
     /// Class for handling audio capture using the Windows Core Audio API.
     /// </summary>
     template <typename T>
@@ -75,6 +82,10 @@ namespace vi {
         // Audio frame batch size equal to sample size for further processing
         size_t m_sizeBatch;
 
+        // Number of audio frame channels (default 2)
+        int m_nNumberOfChannels;
+
+
     public:
 
         /// <summary>
@@ -97,7 +108,7 @@ namespace vi {
         /// Initializes COM library and creates a multimedia device enumerator.
         /// </summary>
         CiAudio() : m_pAudioClient(nullptr), m_pFormat(nullptr), m_pCaptureClient(nullptr), m_pCollection(nullptr), m_pDevice(nullptr),
-            m_sizeAudioClientNo(-1), m_dwSamplesPerSec(0), m_nMessageID(1), m_sizeBatch(0) {
+            m_sizeAudioClientNo(-1), m_dwSamplesPerSec(0), m_nMessageID(1), m_sizeBatch(0), m_nNumberOfChannels(2) {
             // Initialize COM library using RAII.
             HRESULT hr = CoInitialize(nullptr);
             if (FAILED(hr)) {
@@ -174,6 +185,22 @@ namespace vi {
         /// <param name="sizeBatch">The new batch size.</param>
         void setBatchSize(const size_t sizeBatch) {
             m_sizeBatch = sizeBatch;
+        }
+
+        /// <summary>
+        /// Gets the number of audio channels.
+        /// </summary>
+        /// <returns>The number of audio channels.</returns>
+        int getNumberOfChannels() const {
+            return m_nNumberOfChannels;
+        }
+
+        /// <summary>
+        /// Sets the number of audio channels.
+        /// </summary>
+        /// <param name="nNumberOfChannels">The new number of audio channels.</param>
+        void setNumberOfChannels(const int nNumberOfChannels) {
+            m_nNumberOfChannels = nNumberOfChannels;
         }
 
         /// <summary>
