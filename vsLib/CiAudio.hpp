@@ -25,15 +25,14 @@ namespace vi {
     /// Structure to hold audio frame data with two channels.
     /// </summary>
     struct AudioCH2F {
-        float chA;
-        float chB;
+        float ch[2];
     };
 
     /// <summary>
     /// Structure to hold audio frame data with one channel.
     /// </summary>
     struct AudioCH1F {
-        float chA;
+        float ch[1];
     };
 
     /// <summary>
@@ -142,7 +141,7 @@ namespace vi {
         /// <summary>
         /// Gets the captured audio data.
         /// </summary>
-        /// <returns>A vector containing audio frame data with two channels.</returns>
+        /// <returns>A vector containing audio frame data.</returns>
         std::vector<T> getAudioData() const {
             return m_audioData;
         }
@@ -222,8 +221,8 @@ namespace vi {
                 }
 
                 for (std::size_t i = 0; i < N; ++i) {
-                    chAData.push_back(m_audioData[i].chA);
-                    chBData.push_back(m_audioData[i].chB);
+                    chAData.push_back(m_audioData[i].ch[0]);
+                    chBData.push_back(m_audioData[i].ch[1]);
                 }
 
                 m_audioData.erase(m_audioData.begin(), m_audioData.begin() + N);  // Remove the N first frames
@@ -240,7 +239,6 @@ namespace vi {
 
             std::vector<float> chAData;
             std::vector<float> chBData;
-
             {
                 // Lock the mutex while modifying the queue
                 std::lock_guard<std::mutex> lock(m_mtx);
@@ -248,8 +246,8 @@ namespace vi {
                 if (m_sizeBatch > m_audioData.size()) return { chAData, chBData };
 
                 for (std::size_t i = 0; i < m_sizeBatch; ++i) {
-                    chAData.push_back(m_audioData[i].chA);
-                    chBData.push_back(m_audioData[i].chB);
+                    chAData.push_back(m_audioData[i].ch[0]);
+                    chBData.push_back(m_audioData[i].ch[1]);
                 }
 
                 m_audioData.erase(m_audioData.begin(), m_audioData.begin() + m_sizeBatch);  // Remove the N first frames
@@ -272,7 +270,7 @@ namespace vi {
                 if (m_sizeBatch > m_audioData.size()) return { chAData };
 
                 for (std::size_t i = 0; i < m_sizeBatch; ++i) {
-                    chAData.push_back(m_audioData[i].chA);
+                    chAData.push_back(m_audioData[i].ch[0]);
                 }
 
                 m_audioData.erase(m_audioData.begin(), m_audioData.begin() + m_sizeBatch);  // Remove the N first frames
@@ -280,7 +278,6 @@ namespace vi {
 
             return { chAData };
         }
-
 
         /// <summary>
         /// Activates an audio endpoint by its index.
