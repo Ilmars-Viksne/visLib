@@ -183,11 +183,22 @@ namespace vi {
             if (m_nIndexMaxF > nOnesideSize) m_nIndexMaxF = nOnesideSize;
             if (m_nIndexMinF > m_nIndexMaxF) m_nIndexMinF = m_nIndexMaxF;
 
-            std::vector<float> onesidePowerA(nOnesideSize);
-            std::vector<float> onesidePowerB(nOnesideSize);
+            if (this->m_nNumberOfChannels == 2)
+            {
+                std::vector<float> onesidePowerA(nOnesideSize);
+                std::vector<float> onesidePowerB(nOnesideSize);
 
-            if (m_nDoFor == TO_CSV_A) savePowerAsCSV_A(onesidePowerA, onesidePowerB);
-            if (m_nDoFor == TO_CONSOLE_A) showPowerOnConsole_A(onesidePowerA, onesidePowerB);
+                if (m_nDoFor == TO_CSV_A) savePowerAsCSV_A(onesidePowerA, onesidePowerB);
+                if (m_nDoFor == TO_CONSOLE_A) showPowerOnConsole_A(onesidePowerA, onesidePowerB);
+            }
+
+
+            if (this->m_nNumberOfChannels == 1)
+            {
+                std::vector<float> onesidePowerA(nOnesideSize);
+
+                if (m_nDoFor == TO_CONSOLE_A) showPowerOnConsole_ACH1(onesidePowerA);
+            }
 
             m_oDft.releaseOpenCLResources();
         }
@@ -228,6 +239,44 @@ namespace vi {
 
             } while (this->m_nMessageID == this->AM_DATASTART || this->getAudioDataSize() >= this->m_sizeBatch);
         }
+
+
+        void showPowerOnConsole_ACH1(std::vector<float>& onesidePowerA) {
+            size_t i = 1;
+            do
+            {
+                // Get the read audio data
+                std::tuple<std::vector<float>>
+                    audioData = this->moveFirstSampleCH1();
+
+                if (this->m_sizeBatch > std::get<0>(audioData).size()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    continue;
+                }
+
+                cl_int err = m_oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
+                if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
+
+                // Move the cursor to the beginning of the console
+                setCursorPosition(0, 0);
+                printf("\n  Normalized One-Sided Power Spectrum after ");
+                printf(" %10.6f seconds (frames left: %6d)\n", i * m_dbTimeStep, static_cast<int>(this->getAudioDataSize()));
+                printf("----------------------------------------------\n");
+                printf(" Frequency | Index  |   Power A  |   Power B\n");
+                printf("----------------------------------------------\n");
+
+                for (int j = m_nIndexMinF; j <= m_nIndexMaxF; ++j) {
+                    float freq = j * m_fpFrequencyStep;
+                    printf("%10.2f | %6d | %10.6f\n", freq, j, onesidePowerA.data()[j]);
+                }
+
+                ++i;
+
+            } while (this->m_nMessageID == this->AM_DATASTART || this->getAudioDataSize() >= this->m_sizeBatch);
+        }
+
+
+
 
         void savePowerAsCSV_A(std::vector<float>& onesidePowerA, std::vector<float>& onesidePowerB) {
 
