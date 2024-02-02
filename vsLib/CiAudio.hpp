@@ -404,7 +404,6 @@ namespace vi {
                 info << L"Block Align: " << pFormatExt->Format.nBlockAlign << L" (B)\n";
                 info << L"Bits Per Sample: " << pFormatExt->Format.wBitsPerSample << L" (bit)\n";
                 info << L"Size of Extra Information Appended to WAVEFORMATEX: " << pFormatExt->Format.cbSize << L" (bit)\n";
-
                 // Check if the SubFormat is KSDATAFORMAT_SUBTYPE_IEEE_FLOAT or KSDATAFORMAT_SUBTYPE_PCM.
                 if (IsEqualGUID(pFormatExt->SubFormat, KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)) {
                     info << L"SubFormat: KSDATAFORMAT_SUBTYPE_IEEE_FLOAT\n";
@@ -418,6 +417,7 @@ namespace vi {
             }
             else {
                 info << L"Format: " << m_pFormat->wFormatTag << L"\n";
+                m_nNumberOfChannels = static_cast<int>(m_pFormat->nChannels);
                 info << L"Channels: " << m_pFormat->nChannels << L"\n";
                 m_dwSamplesPerSec = m_pFormat->nSamplesPerSec;
                 info << L"Sample Rate: " << m_dwSamplesPerSec << L" (Hz)\n";
