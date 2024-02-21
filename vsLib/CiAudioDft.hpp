@@ -7,7 +7,6 @@
 #include <direct.h>
 #include <io.h>
 
-
 namespace vi {
 
     template <typename T>
@@ -197,6 +196,7 @@ namespace vi {
             {
                 std::vector<float> onesidePowerA(nOnesideSize);
 
+                if (m_nDoFor == TO_CSV_A) savePowerAsCSV_ACH1(onesidePowerA);
                 if (m_nDoFor == TO_CONSOLE_A) showPowerOnConsole_ACH1(onesidePowerA);
             }
 
@@ -247,7 +247,7 @@ namespace vi {
             {
                 // Get the read audio data
                 std::tuple<std::vector<float>>
-                    audioData = this->moveFirstSampleCH1();
+                    audioData = static_cast<std::tuple<std::vector<float>>> (this->moveFirstSampleCH1());
 
                 if (this->m_sizeBatch > std::get<0>(audioData).size()) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -265,15 +265,70 @@ namespace vi {
                 printf(" Frequency | Index  |   Power A  |   Power B\n");
                 printf("----------------------------------------------\n");
 
+
+                //std::vector<float>& data = std::get<0>(audioData);
                 for (int j = m_nIndexMinF; j <= m_nIndexMaxF; ++j) {
                     float freq = j * m_fpFrequencyStep;
                     printf("%10.2f | %6d | %10.6f\n", freq, j, onesidePowerA.data()[j]);
+                    //printf("%10.2f | %6d | %10.6f\n", freq, j, data[j]);
                 }
 
                 ++i;
 
             } while (this->m_nMessageID == this->AM_DATASTART || this->getAudioDataSize() >= this->m_sizeBatch);
         }
+
+
+
+        void savePowerAsCSV_ACH1(std::vector<float>& onesidePowerA) {
+
+            size_t i = 1;
+            double dbFrequencyStep = static_cast<double>(m_fpFrequencyStep);
+
+            do
+            {
+                // Get the read audio data
+                std::tuple<std::vector<float>>
+                    audioData = static_cast<std::tuple<std::vector<float>>> (this->moveFirstSampleCH1());
+
+                if (this->m_sizeBatch > std::get<0>(audioData).size()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    continue;
+                }
+
+                cl_int err = m_oDft.executeOpenCLKernel(std::get<0>(audioData).data(), onesidePowerA.data());
+                if (err != CL_SUCCESS) throw OpenCLException(err, "Failed to execute an OpenCL kernel for A.");
+
+
+                // Create a file with a name that always consists of 10 symbols consisting of "dbTime = i * m_dbTimeStep" expressed in whole microseconds
+                double dbTime = i * m_dbTimeStep;
+                std::ostringstream oss;
+                oss << std::setw(10) << std::setfill('0') << static_cast<int>(dbTime * 1e6);
+                std::string fileName = m_sFolderPath + "/" + oss.str() + ".csv";
+
+
+                // Write to the CSV file
+                FILE* file;
+                err = fopen_s(&file, fileName.c_str(), "w");
+                if (err == 0) {
+                    fprintf(file, "Frequency,Power A\n");
+                    for (int j = m_nIndexMinF; j <= m_nIndexMaxF; ++j) {
+                        // Skip the record if the power of both channels is less than the threshold value.
+                        if (onesidePowerA.data()[j] < m_fpRecordThreshold) continue;
+                        fprintf(file, "%.2f,%f\n", j * dbFrequencyStep, onesidePowerA.data()[j]);
+                    }
+                    fclose(file);
+                }
+                else {
+                    throw std::runtime_error("Can't open a file " + fileName + ".");
+                }
+
+                ++i;
+
+            } while (this->m_nMessageID == this->AM_DATASTART || this->getAudioDataSize() >= this->m_sizeBatch);
+        }
+
+
 
 
 
